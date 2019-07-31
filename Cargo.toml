@@ -1,0 +1,14 @@
+[package]
+name = "curve25519"
+version = "0.1.0"
+authors = ["eschorn@integritychain.com <eschorn@integritychain.com>"]
+edition = "2018"
+
+[dependencies]
+regex = "1"
+
+[dev-dependencies]
+num-bigint = { version = "0.2.0", features = ["rand"] }
+rand = "0.5.4"
+num-traits = "0.2.8"
+
