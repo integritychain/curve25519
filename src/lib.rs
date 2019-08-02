@@ -66,14 +66,14 @@ impl FromStr for Fe25519 {
 impl ops::Add<Fe25519> for Fe25519 {
     type Output = Fe25519;
     fn add(self, _rhs: Fe25519) -> Fe25519 {
-        let mut z = self.x0 as u128 + _rhs.x0 as u128;
-        let x0 = z as u64;
-        z = self.x1 as u128 + _rhs.x1 as u128 + (z >> 64);
-        let x1 = z as u64;
-        z = self.x2 as u128 + _rhs.x2 as u128 + (z >> 64);
-        let x2 = z as u64;
-        z = self.x3 as u128 + _rhs.x3 as u128 + (z >> 64);
-        let x3 = z as u64 & 0x7FFFFFFFFFFFFFFF;
+        let z0 = self.x0 as u128 + _rhs.x0 as u128;
+        let x0 = z0 as u64;
+        let z1 = self.x1 as u128 + _rhs.x1 as u128 + (z0 >> 64);
+        let x1 = z1 as u64;
+        let z2 = self.x2 as u128 + _rhs.x2 as u128 + (z1 >> 64);
+        let x2 = z2 as u64;
+        let z3 = self.x3 as u128 + _rhs.x3 as u128 + (z2 >> 64);
+        let x3 = z3 as u64 & 0x7FFFFFFFFFFFFFFF;  // Fix wrt 25519
         Fe25519 { x3, x2, x1, x0 }
     }
 }
@@ -81,52 +81,51 @@ impl ops::Add<Fe25519> for Fe25519 {
 impl ops::Mul<Fe25519> for Fe25519 {
     type Output = (Fe25519, Fe25519);
     fn mul(self: Fe25519, _rhs: Fe25519) -> (Fe25519, Fe25519) {
-        let a = self;
-        let b = _rhs;
 
-        let mut z = a.x0 as u128 * b.x0 as u128;
-        let t0 = z as u64;
-        z = a.x0 as u128 * b.x1 as u128 + (z >> 64);
-        let t1 = z as u64;
-        z = a.x0 as u128 * b.x2 as u128 + (z >> 64);
-        let t2 = z as u64;
-        z = a.x0 as u128 * b.x3 as u128 + (z >> 64);
-        let t3 = z as u64;
-        let t4 = (z >> 64) as u64;
+        // Algorithm 2.9 from p31 of Guide to Elliptic Curve Cryptography
 
-        let mut z = a.x1 as u128 * b.x0 as u128 + t1 as u128;
-        let t1 = z as u64;
-        z = a.x1 as u128 * b.x1 as u128 + (z >> 64) + t2 as u128;
-        let t2 = z as u64;
-        z = a.x1 as u128 * b.x2 as u128 + (z >> 64) + t3 as u128;
-        let t3 = z as u64;
-        z = a.x1 as u128 * b.x3 as u128 + (z >> 64) + t4 as u128;
-        let t4 = z as u64;
-        let t5 = (z >> 64) as u64;
+        let z0 = self.x0 as u128 * _rhs.x0 as u128;
+        let x0 = z0 as u64;
+        let z1 = self.x0 as u128 * _rhs.x1 as u128 + (z0 >> 64);
+        let t0 = z1 as u64;
+        let z2 = self.x0 as u128 * _rhs.x2 as u128 + (z1 >> 64);
+        let t1 = z2 as u64;
+        let z3 = self.x0 as u128 * _rhs.x3 as u128 + (z2 >> 64);
+        let t2 = z3 as u64;
+        let t3 = (z3 >> 64) as u64;
 
-        let mut z = a.x2 as u128 * b.x0 as u128 + t2 as u128;
-        let t2 = z as u64;
-        z = a.x2 as u128 * b.x1 as u128 + (z >> 64) + t3 as u128;
-        let t3 = z as u64;
-        z = a.x2 as u128 * b.x2 as u128 + (z >> 64) + t4 as u128;
-        let t4 = z as u64;
-        z = a.x2 as u128 * b.x3 as u128 + (z >> 64) + t5 as u128;
-        let t5 = z as u64;
-        let t6 = (z >> 64) as u64;
+        let z4 = self.x1 as u128 * _rhs.x0 as u128 + t0 as u128;
+        let x1 = z4 as u64;
+        let z5 = self.x1 as u128 * _rhs.x1 as u128 + (z4 >> 64) + t1 as u128;
+        let t4 = z5 as u64;
+        let z6 = self.x1 as u128 * _rhs.x2 as u128 + (z5 >> 64) + t2 as u128;
+        let t5 = z6 as u64;
+        let z7 = self.x1 as u128 * _rhs.x3 as u128 + (z6 >> 64) + t3 as u128;
+        let t6 = z7 as u64;
+        let t7 = (z7 >> 64) as u64;
 
-        let mut z = a.x3 as u128 * b.x0 as u128 + t3 as u128;
-        let t3 = z as u64;
-        z = a.x3 as u128 * b.x1 as u128 + (z >> 64) + t4 as u128;
-        let t4 = z as u64;
-        z = a.x3 as u128 * b.x2 as u128 + (z >> 64) + t5 as u128;
-        let t5 = z as u64;
-        z = a.x3 as u128 * b.x3 as u128 + (z >> 64) + t6 as u128;
-        let t6 = z as u64;
-        let t7 = (z >> 64) as u64;
+        let z8 = self.x2 as u128 * _rhs.x0 as u128 + t4 as u128;
+        let x2 = z8 as u64;
+        let z9 = self.x2 as u128 * _rhs.x1 as u128 + (z8 >> 64) + t5 as u128;
+        let t8 = z9 as u64;
+        let za = self.x2 as u128 * _rhs.x2 as u128 + (z9 >> 64) + t6 as u128;
+        let t9 = za as u64;
+        let zb = self.x2 as u128 * _rhs.x3 as u128 + (za >> 64) + t7 as u128;
+        let ta = zb as u64;
+        let tb = (zb >> 64) as u64;
 
+        let zc = self.x3 as u128 * _rhs.x0 as u128 + t8 as u128;
+        let x3 = zc as u64;
+        let zd = self.x3 as u128 * _rhs.x1 as u128 + (zc >> 64) + t9 as u128;
+        let x4 = zd as u64;
+        let ze = self.x3 as u128 * _rhs.x2 as u128 + (zd >> 64) + ta as u128;
+        let x5 = ze as u64;
+        let zf = self.x3 as u128 * _rhs.x3 as u128 + (ze >> 64) + tb as u128;
+        let x6 = zf as u64;
+        let x7 = (zf >> 64) as u64;
 
-        let lsb = Fe25519 { x3: t3, x2: t2, x1: t1, x0: t0 };
-        let msb = Fe25519 { x3: t7, x2: t6, x1: t5, x0: t4 };
+        let lsb = Fe25519 { x3: x3, x2: x2, x1: x1, x0: x0 };
+        let msb = Fe25519 { x3: x7, x2: x6, x1: x5, x0: x4 };
         (msb, lsb)
     }
 }
@@ -147,7 +146,7 @@ mod tests {
     #[test]
     fn test_fuzz_add() {
         let mut rng = rand::thread_rng();
-        for _index in 1..10000 {
+        for _index in 1..1000 {
             let a_expected: BigUint = rng.sample(RandomBits::new(254));
             let b_expected: BigUint = rng.sample(RandomBits::new(254));
             let s_expected = Fe25519::from_str(&format!("0x{:064x}", &a_expected + &b_expected)).unwrap();
@@ -163,7 +162,7 @@ mod tests {
         let mut rng = rand::thread_rng();
         let one: BigUint = One::one();
         let two_256 = one << 256;
-        for _index in 1..10000 {
+        for _index in 1..1000 {
             let a_expected: BigUint = rng.sample(RandomBits::new(256));
             let b_expected: BigUint = rng.sample(RandomBits::new(256));
             let lsb_expected = Fe25519::from_str(&format!("0x{:064x}", (&a_expected * &b_expected) % &two_256)).unwrap();
