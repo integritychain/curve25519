@@ -85,7 +85,7 @@ impl ops::Mul<Fe25519> for Fe25519 {
         // Algorithm 2.9 from p31 of Guide to Elliptic Curve Cryptography
 
         let z0 = self.x0 as u128 * _rhs.x0 as u128;
-        let x0 = z0 as u64;
+        let mut x0 = z0 as u64;
         let z1 = self.x0 as u128 * _rhs.x1 as u128 + (z0 >> 64);
         let t0 = z1 as u64;
         let z2 = self.x0 as u128 * _rhs.x2 as u128 + (z1 >> 64);
@@ -95,7 +95,7 @@ impl ops::Mul<Fe25519> for Fe25519 {
         let t3 = (z3 >> 64) as u64;
 
         let z4 = self.x1 as u128 * _rhs.x0 as u128 + t0 as u128;
-        let x1 = z4 as u64;
+        let mut x1 = z4 as u64;
         let z5 = self.x1 as u128 * _rhs.x1 as u128 + (z4 >> 64) + t1 as u128;
         let t4 = z5 as u64;
         let z6 = self.x1 as u128 * _rhs.x2 as u128 + (z5 >> 64) + t2 as u128;
@@ -105,7 +105,7 @@ impl ops::Mul<Fe25519> for Fe25519 {
         let t7 = (z7 >> 64) as u64;
 
         let z8 = self.x2 as u128 * _rhs.x0 as u128 + t4 as u128;
-        let x2 = z8 as u64;
+        let mut x2 = z8 as u64;
         let z9 = self.x2 as u128 * _rhs.x1 as u128 + (z8 >> 64) + t5 as u128;
         let t8 = z9 as u64;
         let za = self.x2 as u128 * _rhs.x2 as u128 + (z9 >> 64) + t6 as u128;
@@ -115,7 +115,7 @@ impl ops::Mul<Fe25519> for Fe25519 {
         let tb = (zb >> 64) as u64;
 
         let zc = self.x3 as u128 * _rhs.x0 as u128 + t8 as u128;
-        let x3 = zc as u64;
+        let mut x3 = zc as u64;
         let zd = self.x3 as u128 * _rhs.x1 as u128 + (zc >> 64) + t9 as u128;
         let x4 = zd as u64;
         let ze = self.x3 as u128 * _rhs.x2 as u128 + (zd >> 64) + ta as u128;
@@ -124,8 +124,23 @@ impl ops::Mul<Fe25519> for Fe25519 {
         let x6 = zf as u64;
         let x7 = (zf >> 64) as u64;
 
+        let r0 = x3 >> 63;
+        let zz1 = x0 as u128 + (r0 as u128 * 19) + (x4 as u128 * 38);
+        x0 = zz1 as u64;
+        let zz2 = x1 as u128 + (x5 as u128 * 38) + (zz1 >> 64);
+        let x1 = zz2 as u64;
+        let zz3 = x2 as u128 + (x6 as u128 * 38) + (zz2 >> 64);
+        x2 = zz3 as u64;
+        let zz4 = x3 as u128 + (x7 as u128 * 38) + (zz3 >> 64);
+        x3 = zz4 as u64;
+
+        let r1 = zz4 >> 63;
+        let zz1 = x0 as u128 + (r1 as u128 * 19); // could carry?
+        x0 = zz1 as u64;
+
+        x3 = x3 & ((1 << 63 as u64) - 1);
         let lsb = Fe25519 { x3: x3, x2: x2, x1: x1, x0: x0 };
-        let msb = Fe25519 { x3: x7, x2: x6, x1: x5, x0: x4 };
+        let msb = Fe25519 { x3: 0, x2: 0, x1: 0, x0: 0 };
         (msb, lsb)
     }
 }
@@ -137,11 +152,15 @@ mod tests {
     extern crate rand;
     extern crate num_traits;
 
+    use std::ops::Sub;
+
     use num_bigint::{BigUint, RandomBits};
     use num_traits::One;
     use rand::Rng;
 
     use super::*;
+
+    use self::num_traits::Num;
 
     #[test]
     fn test_fuzz_add() {
@@ -157,21 +176,42 @@ mod tests {
         }
     }
 
+//    #[test]
+//    fn test_fuzz_mul() {
+//        let mut rng = rand::thread_rng();
+//        let one: BigUint = One::one();
+//        let two_256 = one << 256;
+//        for _index in 1..1000 {
+//            let a_expected: BigUint = rng.sample(RandomBits::new(256));
+//            let b_expected: BigUint = rng.sample(RandomBits::new(256));
+//            let lsb_expected = Fe25519::from_str(&format!("0x{:064x}", (&a_expected * &b_expected) % &two_256)).unwrap();
+//            let msb_expected = Fe25519::from_str(&format!("0x{:064x}", (&a_expected * &b_expected) / &two_256)).unwrap();
+//            let a_actual = Fe25519::from_str(&format!("0x{:064x}", a_expected)).unwrap();
+//            let b_actual = Fe25519::from_str(&format!("0x{:064x}", b_expected)).unwrap();
+//            let actual = a_actual * b_actual;
+//            assert_eq!(lsb_expected, actual.1);
+//            assert_eq!(msb_expected, actual.0);
+//        }
+//    }
+
     #[test]
-    fn test_fuzz_mul() {
+    fn text_fuzz_mul2() {
+        //let x = BigUint::from_str_radix("0F", 16).unwrap();
         let mut rng = rand::thread_rng();
         let one: BigUint = One::one();
-        let two_256 = one << 256;
+        let two255m19 = (one << 255).sub(19 as u32);
+        //println!("{:x}", two255m19);
         for _index in 1..1000 {
-            let a_expected: BigUint = rng.sample(RandomBits::new(256));
-            let b_expected: BigUint = rng.sample(RandomBits::new(256));
-            let lsb_expected = Fe25519::from_str(&format!("0x{:064x}", (&a_expected * &b_expected) % &two_256)).unwrap();
-            let msb_expected = Fe25519::from_str(&format!("0x{:064x}", (&a_expected * &b_expected) / &two_256)).unwrap();
+            let a_expected: BigUint = rng.sample(RandomBits::new(255));
+            let b_expected: BigUint = rng.sample(RandomBits::new(250));
+            let lsb_expected = Fe25519::from_str(&format!("0x{:064x}", (&a_expected * &b_expected) % &two255m19)).unwrap();
+            let msb_expected = Fe25519::from_str(&format!("0x{:064x}", (&a_expected * &b_expected) / &two255m19)).unwrap();
             let a_actual = Fe25519::from_str(&format!("0x{:064x}", a_expected)).unwrap();
             let b_actual = Fe25519::from_str(&format!("0x{:064x}", b_expected)).unwrap();
             let actual = a_actual * b_actual;
             assert_eq!(lsb_expected, actual.1);
-            assert_eq!(msb_expected, actual.0);
+            println!("asdf");
+            //assert_eq!(msb_expected, actual.0);
         }
     }
 }
