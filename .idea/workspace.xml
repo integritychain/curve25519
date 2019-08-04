@@ -13,7 +13,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5d6280e8-31c4-49f3-828d-fd86ce7cc2bf" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/src/support.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/tests.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib.rs" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -24,6 +27,13 @@
   </component>
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Rust File" />
+      </list>
+    </option>
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -83,7 +93,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1564437176618</updated>
-      <workItem from="1564437177693" duration="27509000" />
+      <workItem from="1564437177693" duration="43668000" />
     </task>
     <task id="LOCAL-00001" summary="initial commit">
       <created>1564537894140</created>
@@ -99,7 +109,14 @@
       <option name="project" value="LOCAL" />
       <updated>1564782682399</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="reduce almost working">
+      <created>1564796244420</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1564796244420</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -121,7 +138,8 @@
     <option name="CHECK_NEW_TODO" value="false" />
     <MESSAGE value="initial commit" />
     <MESSAGE value="ready to reduce..." />
-    <option name="LAST_COMMIT_MESSAGE" value="ready to reduce..." />
+    <MESSAGE value="reduce almost working" />
+    <option name="LAST_COMMIT_MESSAGE" value="reduce almost working" />
     <option name="OPTIMIZE_IMPORTS_BEFORE_PROJECT_COMMIT" value="true" />
     <option name="REFORMAT_BEFORE_PROJECT_COMMIT" value="true" />
     <option name="REARRANGE_BEFORE_PROJECT_COMMIT" value="true" />

@@ -1,87 +1,71 @@
+#[macro_use]
+extern crate lazy_static;
 extern crate regex;
 
-use std::fmt;
-use std::num::ParseIntError;
 use std::ops;
-use std::str::FromStr;
 
-use regex::Regex;
+mod support;
+
+#[cfg(test)]
+mod tests;
 
 #[derive(PartialEq)]
-struct Fe25519 {
-    // 63+64+64+64=255
+pub struct Fe25519 {
+    // 63+64+64+64=255; X3 is MSB
     x3: u64,
     x2: u64,
     x1: u64,
     x0: u64,
 }
 
-impl fmt::Display for Fe25519 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "0x{:016x}-{:016x}-{:016x}-{:016x}", self.x3, self.x2, self.x1, self.x0)
-    }
-}
-
-impl fmt::Debug for Fe25519 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "0x{:016x}-{:016x}-{:016x}-{:016x}", self.x3, self.x2, self.x1, self.x0)
-    }
-}
-
-#[derive(Debug)]
-enum ParseError {
-    LengthToShort,
-    LengthToLong,
-    Missing0x,
-    ParseErrorX3(ParseIntError),
-    ParseErrorX2(ParseIntError),
-    ParseErrorX1(ParseIntError),
-    ParseErrorX0(ParseIntError),
-}
-
-impl FromStr for Fe25519 {
-    type Err = self::ParseError;
-    fn from_str(hex_str: &str) -> Result<Self, self::ParseError> {
-        if &hex_str[0..2] != "0x" { return Err(self::ParseError::Missing0x); };
-        let re = Regex::new(r"[^A-Fa-f0-9]").unwrap();
-        let tmp_str = re.replace_all(hex_str, "");
-        let x = tmp_str.len();
-        if x < 65 { return Err(ParseError::LengthToShort); }
-        if x > 65 { return Err(ParseError::LengthToLong); }
-        let (x3, x2, x1, x0) = match
-            (u64::from_str_radix(&tmp_str[(x - 64)..(x - 48)], 16),
-             u64::from_str_radix(&tmp_str[(x - 48)..(x - 32)], 16),
-             u64::from_str_radix(&tmp_str[(x - 32)..(x - 16)], 16),
-             u64::from_str_radix(&tmp_str[(x - 16)..x], 16)) {
-            (Ok(x3), Ok(x2), Ok(x1), Ok(x0)) => (x3, x2, x1, x0),
-            (Err(e), _, _, _) => return Err(self::ParseError::ParseErrorX3(e)),
-            (_, Err(e), _, _) => return Err(self::ParseError::ParseErrorX2(e)),
-            (_, _, Err(e), _) => return Err(self::ParseError::ParseErrorX1(e)),
-            (_, _, _, Err(e)) => return Err(self::ParseError::ParseErrorX0(e)),
-        };
-        Ok(Fe25519 { x3, x2, x1, x0 })
-    }
-}
-
 impl ops::Add<Fe25519> for Fe25519 {
     type Output = Fe25519;
     fn add(self, _rhs: Fe25519) -> Fe25519 {
+        // add
         let z0 = self.x0 as u128 + _rhs.x0 as u128;
-        let x0 = z0 as u64;
+        let t0 = z0 as u64;
         let z1 = self.x1 as u128 + _rhs.x1 as u128 + (z0 >> 64);
-        let x1 = z1 as u64;
+        let t1 = z1 as u64;
         let z2 = self.x2 as u128 + _rhs.x2 as u128 + (z1 >> 64);
-        let x2 = z2 as u64;
+        let t2 = z2 as u64;
         let z3 = self.x3 as u128 + _rhs.x3 as u128 + (z2 >> 64);
-        let x3 = z3 as u64 & 0x7FFFFFFFFFFFFFFF;  // Fix wrt 25519
-        Fe25519 { x3, x2, x1, x0 }
+        let t3 = z3 as u64;
+
+        // reduce
+        let z4 = t0 as u128 + (z3 >> 63) * 19;
+        let x0 = z4 as u64;
+        let z5 = t1 as u128 + (z4 >> 64);
+        let x1 = z5 as u64;
+        let z6 = t2 as u128 + (z5 >> 64);
+        let x2 = z6 as u64;
+        let z7 = t3 as u128 + (z6 >> 64);
+        let x3 = (z7 as u64) & ((1 << 63 as u64) - 1);
+
+        // this could still be > 2*255-19; need to add 19; and if it rolls over return that result, otherwise return original
+
+        // add 19
+        let a0 = x0 as u128 + 19;
+        let a1 = (a0 >> 64) + x1 as u128;
+        let a2 = (a1 >> 64) + x2 as u128;
+        let a3 = (a2 >> 64) + x3 as u128;
+
+        // if it rolled over, return the rollover
+        if (a3 >> 63) == 1 {
+            Fe25519 {
+                x3: (a3 as u64) & 0x7FFFFFFFFFFFFFFF,
+                x2: a2 as u64,
+                x1: a1 as u64,
+                x0: a0 as u64,
+            }
+        } else {
+            Fe25519 { x3, x2, x1, x0 }
+        }
     }
 }
 
 impl ops::Mul<Fe25519> for Fe25519 {
     type Output = (Fe25519, Fe25519);
     fn mul(self: Fe25519, _rhs: Fe25519) -> (Fe25519, Fe25519) {
-
         // Algorithm 2.9 from p31 of Guide to Elliptic Curve Cryptography
 
         let z0 = self.x0 as u128 * _rhs.x0 as u128;
@@ -124,94 +108,43 @@ impl ops::Mul<Fe25519> for Fe25519 {
         let x6 = zf as u64;
         let x7 = (zf >> 64) as u64;
 
-        let r0 = x3 >> 63;
-        let zz1 = x0 as u128 + (r0 as u128 * 19) + (x4 as u128 * 38);
-        x0 = zz1 as u64;
-        let zz2 = x1 as u128 + (x5 as u128 * 38) + (zz1 >> 64);
-        let x1 = zz2 as u64;
-        let zz3 = x2 as u128 + (x6 as u128 * 38) + (zz2 >> 64);
-        x2 = zz3 as u64;
-        let zz4 = x3 as u128 + (x7 as u128 * 38) + (zz3 >> 64);
-        x3 = zz4 as u64;
+        let zz0 = x0 as u128 + (x4 as u128 * 38);
+        x0 = zz0 as u64;
+        let zz1 = x1 as u128 + (x5 as u128 * 38) + (zz0 >> 64);
+        x1 = zz1 as u64;
+        let zz2 = x2 as u128 + (x6 as u128 * 38) + (zz1 >> 64);
+        x2 = zz2 as u64;
+        let zz3 = x3 as u128 + (x7 as u128 * 38) + (zz2 >> 64);
+        x3 = zz3 as u64;
 
-        let r1 = zz4 >> 63;
-        let zz1 = x0 as u128 + (r1 as u128 * 19); // could carry?
-        x0 = zz1 as u64;
+        // Orig
+        //        let zz0 = x0 as u128 + ((x3 >> 63) as u128 | (x4 << 1) as u128) * 19;
+        //        x0 = zz0 as u64;
+        //        let zz1 = x1 as u128 + ((x4 >> 63) as u128 | (x5 << 1) as u128) * 19 + (zz0 >> 64);
+        //        x1 = zz1 as u64;
+        //        let zz2 = x2 as u128 + ((x5 >> 63) as u128 | (x6 << 1) as u128) * 19 + (zz1 >> 64);
+        //        x2 = zz2 as u64;
+        //        let zz3 = x3 as u128 + ((x6 >> 63) as u128 | (x7 << 1) as u128) * 19 + (zz2 >> 64);
+        //        x3 = zz3 as u64;
+
+        //let zzz0 = x0 as u128 + ((zz3 >> 63) as u128 * 19); // + ((x7 >> 63) as u128 * 19); // what happened to LSB of x7!!!!!
+        //x0 = zzz0 as u64;
+        // sometimes we return too large of a result (by 19!)
+        // probably have to roll the carries through again?
 
         x3 = x3 & ((1 << 63 as u64) - 1);
-        let lsb = Fe25519 { x3: x3, x2: x2, x1: x1, x0: x0 };
-        let msb = Fe25519 { x3: 0, x2: 0, x1: 0, x0: 0 };
+        let lsb = Fe25519 {
+            x3: x3,
+            x2: x2,
+            x1: x1,
+            x0: x0,
+        };
+        let msb = Fe25519 {
+            x3: 0,
+            x2: 0,
+            x1: 0,
+            x0: 0,
+        };
         (msb, lsb)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[cfg(test)]
-    extern crate num_bigint;
-    extern crate rand;
-    extern crate num_traits;
-
-    use std::ops::Sub;
-
-    use num_bigint::{BigUint, RandomBits};
-    use num_traits::One;
-    use rand::Rng;
-
-    use super::*;
-
-    use self::num_traits::Num;
-
-    #[test]
-    fn test_fuzz_add() {
-        let mut rng = rand::thread_rng();
-        for _index in 1..1000 {
-            let a_expected: BigUint = rng.sample(RandomBits::new(254));
-            let b_expected: BigUint = rng.sample(RandomBits::new(254));
-            let s_expected = Fe25519::from_str(&format!("0x{:064x}", &a_expected + &b_expected)).unwrap();
-            let a_actual = Fe25519::from_str(&format!("0x{:064x}", a_expected)).unwrap();
-            let b_actual = Fe25519::from_str(&format!("0x{:064x}", b_expected)).unwrap();
-            let s_actual = a_actual + b_actual;
-            assert_eq!(s_expected, s_actual);
-        }
-    }
-
-//    #[test]
-//    fn test_fuzz_mul() {
-//        let mut rng = rand::thread_rng();
-//        let one: BigUint = One::one();
-//        let two_256 = one << 256;
-//        for _index in 1..1000 {
-//            let a_expected: BigUint = rng.sample(RandomBits::new(256));
-//            let b_expected: BigUint = rng.sample(RandomBits::new(256));
-//            let lsb_expected = Fe25519::from_str(&format!("0x{:064x}", (&a_expected * &b_expected) % &two_256)).unwrap();
-//            let msb_expected = Fe25519::from_str(&format!("0x{:064x}", (&a_expected * &b_expected) / &two_256)).unwrap();
-//            let a_actual = Fe25519::from_str(&format!("0x{:064x}", a_expected)).unwrap();
-//            let b_actual = Fe25519::from_str(&format!("0x{:064x}", b_expected)).unwrap();
-//            let actual = a_actual * b_actual;
-//            assert_eq!(lsb_expected, actual.1);
-//            assert_eq!(msb_expected, actual.0);
-//        }
-//    }
-
-    #[test]
-    fn text_fuzz_mul2() {
-        //let x = BigUint::from_str_radix("0F", 16).unwrap();
-        let mut rng = rand::thread_rng();
-        let one: BigUint = One::one();
-        let two255m19 = (one << 255).sub(19 as u32);
-        //println!("{:x}", two255m19);
-        for _index in 1..1000 {
-            let a_expected: BigUint = rng.sample(RandomBits::new(255));
-            let b_expected: BigUint = rng.sample(RandomBits::new(250));
-            let lsb_expected = Fe25519::from_str(&format!("0x{:064x}", (&a_expected * &b_expected) % &two255m19)).unwrap();
-            let msb_expected = Fe25519::from_str(&format!("0x{:064x}", (&a_expected * &b_expected) / &two255m19)).unwrap();
-            let a_actual = Fe25519::from_str(&format!("0x{:064x}", a_expected)).unwrap();
-            let b_actual = Fe25519::from_str(&format!("0x{:064x}", b_expected)).unwrap();
-            let actual = a_actual * b_actual;
-            assert_eq!(lsb_expected, actual.1);
-            println!("asdf");
-            //assert_eq!(msb_expected, actual.0);
-        }
     }
 }
