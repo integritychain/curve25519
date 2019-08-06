@@ -1,3 +1,6 @@
+#![deny(clippy::all)]
+
+
 use std::fmt;
 use std::num::ParseIntError;
 use std::str::FromStr;

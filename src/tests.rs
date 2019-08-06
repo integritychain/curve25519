@@ -1,3 +1,5 @@
+#![deny(clippy::all)]
+
 #[cfg(test)]
 use std::ops::Sub;
 use std::str::FromStr;
@@ -30,49 +32,44 @@ fn gimme_number(bits: usize) -> BigUint {
 
 #[test]
 fn test_corner_add() {
-    let a_expected = &*TWO255M19;
-    let b_expected = &*TWO255M19;
-    let s_expected = Fe25519::from_str(&format!(
-        "0x{:064x}",
-        (a_expected + b_expected) % &*TWO255M19
-    ))
-        .unwrap();
-    let a_actual = Fe25519::from_str(&format!("0x{:064x}", a_expected)).unwrap();
-    let b_actual = Fe25519::from_str(&format!("0x{:064x}", b_expected)).unwrap();
-    let s_actual = a_actual + b_actual;
-    assert_eq!(s_expected, s_actual);
+    let a_exp = (&*TWO255M19).clone().sub(1 as u32);
+    let b_exp: BigUint = One::one(); //= &(&*TWO255M19).clone().sub(1 as u32);
+    let sum_exp =
+        Fe25519::from_str(&format!("0x{:064x}", (&a_exp + &b_exp) % &*TWO255M19)).unwrap();
+    let a_act = Fe25519::from_str(&format!("0x{:064x}", &a_exp)).unwrap();
+    let b_act = Fe25519::from_str(&format!("0x{:064x}", &b_exp)).unwrap();
+    let sum_act = a_act + b_act;
+    assert_eq!(sum_exp, sum_act);
 }
 
 #[test]
 fn test_fuzz_add() {
-    for _index in 1..1000 {
-        let a_expected = gimme_number(256);
-        let b_expected = gimme_number(256);
-        let s_expected = Fe25519::from_str(&format!(
-            "0x{:064x}",
-            (&a_expected + &b_expected) % &*TWO255M19
-        ))
-            .unwrap();
-        let a_actual = Fe25519::from_str(&format!("0x{:064x}", a_expected)).unwrap();
-        let b_actual = Fe25519::from_str(&format!("0x{:064x}", b_expected)).unwrap();
+    for _index in 1..10000 {
+        let a_exp = gimme_number(256);
+        let b_exp = gimme_number(256);
+        let sum_exp =
+            Fe25519::from_str(&format!("0x{:064x}", (&a_exp + &b_exp) % &*TWO255M19)).unwrap();
+        let a_actual = Fe25519::from_str(&format!("0x{:064x}", a_exp)).unwrap();
+        let b_actual = Fe25519::from_str(&format!("0x{:064x}", b_exp)).unwrap();
         let s_actual = a_actual + b_actual;
-        assert_eq!(s_expected, s_actual);
+        assert_eq!(sum_exp, s_actual);
     }
 }
 
 #[test]
 fn text_fuzz_mul() {
-    for _index in 1..1000 {
-        let a_expected = gimme_number(26);
-        let b_expected = gimme_number(26);
-        let lsb_expected = Fe25519::from_str(&format!(
-            "0x{:064x}",
-            (&a_expected * &b_expected) % &*TWO255M19
-        ))
-            .unwrap();
-        let a_actual = Fe25519::from_str(&format!("0x{:064x}", a_expected)).unwrap();
-        let b_actual = Fe25519::from_str(&format!("0x{:064x}", b_expected)).unwrap();
-        let lsb_actual = (a_actual * b_actual).1;
-        assert_eq!(lsb_expected, lsb_actual);
+    for _index in 1..10000 {
+        let a_exp = gimme_number(256);
+        let b_exp = gimme_number(256);
+        let mul_exp =
+            Fe25519::from_str(&format!("0x{:064x}", (&a_exp * &b_exp) % &*TWO255M19)).unwrap();
+        let mul_orig = &a_exp * &b_exp;
+        if mul_orig == *TWO255M19 {
+            println!("{}", mul_orig);
+        }
+        let a_act = Fe25519::from_str(&format!("0x{:064x}", a_exp)).unwrap();
+        let b_act = Fe25519::from_str(&format!("0x{:064x}", b_exp)).unwrap();
+        let mul_act = a_act * b_act;
+        assert_eq!(mul_exp, mul_act);
     }
 }

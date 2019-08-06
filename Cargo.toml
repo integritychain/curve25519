@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 regex = "1"
+lazy_static = "1.3.0"  # This should not be here
 
 [dev-dependencies]
 num-bigint = { version = "0.2.0", features = ["rand"] }
