@@ -1,10 +1,5 @@
 #![deny(clippy::all)]
 
-// TODO:
-//   1. Can some of the MSB mults could be folded into a reduce round?
-//   2. Can mults be reordered by 128b sums, e.g. x0*x1 + x1*x0?
-//   3. Can a Karatsuba approach be folded in?
-
 #[macro_use]
 extern crate lazy_static;
 extern crate regex;
@@ -31,11 +26,12 @@ pub struct Fe25519 {
 impl ops::Add<Fe25519> for Fe25519 {
     type Output = Fe25519;
     fn add(self, _rhs: Fe25519) -> Fe25519 {
-        debug_assert!(  // Check the input is less than 2**255 - 19
-                        (self.x3 != 0x7FFF_FFFF_FFFF_FFFF)
-                            | (self.x2 != 0xFFFF_FFFF_FFFF_FFFF)
-                            | (self.x1 != 0xFFFF_FFFF_FFFF_FFFF)
-                            | (self.x0 < 0xFFFF_FFFF_FFFF_FFED)
+        debug_assert!(
+            // Check the input is less than 2**255 - 19
+            (self.x3 != 0x7FFF_FFFF_FFFF_FFFF)
+                | (self.x2 != 0xFFFF_FFFF_FFFF_FFFF)
+                | (self.x1 != 0xFFFF_FFFF_FFFF_FFFF)
+                | (self.x0 < 0xFFFF_FFFF_FFFF_FFED)
         );
         debug_assert!(
             (_rhs.x3 != 0x7FFF_FFFF_FFFF_FFFF)
@@ -44,24 +40,24 @@ impl ops::Add<Fe25519> for Fe25519 {
                 | (_rhs.x0 < 0xFFFF_FFFF_FFFF_FFED)
         );
         // standard add with carry from one to the next; max sum will be 2**256 - 38
-        let x0px0 = u128::from(self.x0) + u128::from(_rhs.x0);
-        let x00p = x0px0 as u64;
-        let x1px1 = u128::from(self.x1) + u128::from(_rhs.x1) + (x0px0 >> 64);
-        let x11p = x1px1 as u64;
-        let x2px2 = u128::from(self.x2) + u128::from(_rhs.x2) + (x1px1 >> 64);
-        let x22p = x2px2 as u64;
-        let x3px3 = u128::from(self.x3) + u128::from(_rhs.x3) + (x2px2 >> 64);
-        let x33p = x3px3 as u64;
+        let x0ax0 = u128::from(self.x0) + u128::from(_rhs.x0);
+        let x00p = x0ax0 as u64;
+        let x1ax1 = u128::from(self.x1) + u128::from(_rhs.x1) + (x0ax0 >> 64);
+        let x11p = x1ax1 as u64;
+        let x2ax2 = u128::from(self.x2) + u128::from(_rhs.x2) + (x1ax1 >> 64);
+        let x22p = x2ax2 as u64;
+        let x3ax3 = u128::from(self.x3) + u128::from(_rhs.x3) + (x2ax2 >> 64);
+        let x33p = x3ax3 as u64;
 
         // reduce with 2**255 = 19 (so depends upon MSB); max sum here is 2**255
-        let x0p19 = u128::from(x00p) + (x3px3 >> 63) * 19;
-        let x0 = x0p19 as u64;
-        let x1p19 = u128::from(x11p) + (x0p19 >> 64);
-        let x1 = x1p19 as u64;
-        let x2p19 = u128::from(x22p) + (x1p19 >> 64);
-        let x2 = x2p19 as u64;
-        let x3p19 = u128::from(x33p) + (x2p19 >> 64);
-        let x3 = (x3p19 as u64) & UMASK63;
+        let x0a19 = u128::from(x00p) + (x3ax3 >> 63) * 19;
+        let x0 = x0a19 as u64;
+        let x1a19 = u128::from(x11p) + (x0a19 >> 64);
+        let x1 = x1a19 as u64;
+        let x2a19 = u128::from(x22p) + (x1a19 >> 64);
+        let x2 = x2a19 as u64;
+        let x3a19 = u128::from(x33p) + (x2a19 >> 64);
+        let x3 = (x3a19 as u64) & UMASK63;
 
         // sum may still be too large, so add 19 and check rollover
         let r0 = u128::from(x0) + 19;
@@ -77,6 +73,67 @@ impl ops::Add<Fe25519> for Fe25519 {
             x1: !rollover & x1 | rollover & (r1 as u64),
             x0: !rollover & x0 | rollover & (r0 as u64),
         };
+
+        debug_assert!(
+            (result.x3 != 0x7FFF_FFFF_FFFF_FFFF)
+                | (result.x2 != 0xFFFF_FFFF_FFFF_FFFF)
+                | (result.x1 != 0xFFFF_FFFF_FFFF_FFFF)
+                | (result.x0 < 0xFFFF_FFFF_FFFF_FFED)
+        );
+        result
+    }
+}
+
+#[allow(clippy::suspicious_arithmetic_impl)]
+impl ops::Sub<Fe25519> for Fe25519 {
+    type Output = Fe25519;
+    fn sub(self, _rhs: Fe25519) -> Fe25519 {
+        debug_assert!(
+            // Check the input is less than 2**255 - 19
+            (self.x3 != 0x7FFF_FFFF_FFFF_FFFF)
+                | (self.x2 != 0xFFFF_FFFF_FFFF_FFFF)
+                | (self.x1 != 0xFFFF_FFFF_FFFF_FFFF)
+                | (self.x0 < 0xFFFF_FFFF_FFFF_FFED)
+        );
+        debug_assert!(
+            (_rhs.x3 != 0x7FFF_FFFF_FFFF_FFFF)
+                | (_rhs.x2 != 0xFFFF_FFFF_FFFF_FFFF)
+                | (_rhs.x1 != 0xFFFF_FFFF_FFFF_FFFF)
+                | (_rhs.x0 < 0xFFFF_FFFF_FFFF_FFED)
+        );
+
+        let x0sx0 = u128::from(self.x0).overflowing_sub(u128::from(_rhs.x0)).0;
+        let x00p = x0sx0 as u64;
+        let x1sx1 = u128::from(self.x1)
+            .overflowing_sub(u128::from(_rhs.x1))
+            .0
+            .overflowing_sub(x0sx0 >> 127)
+            .0;
+        let x11p = x1sx1 as u64;
+        let x2sx2 = u128::from(self.x2)
+            .overflowing_sub(u128::from(_rhs.x2))
+            .0
+            .overflowing_sub(x1sx1 >> 127)
+            .0;
+        let x22p = x2sx2 as u64;
+        let x3sx3 = u128::from(self.x3)
+            .overflowing_sub(u128::from(_rhs.x3))
+            .0
+            .overflowing_sub(x2sx2 >> 127)
+            .0;
+        let x33p = x3sx3 as u64;
+
+        // If carry set, we add another 19 <----- VERY CLOSE (WHY IS IT SUB???)
+        let zz0 = u128::from(x00p) - u128::from(x33p >> 63) * 19;
+        let x0 = zz0 as u64;
+        let zz1 = (zz0 >> 64) + u128::from(x11p);
+        let x1 = zz1 as u64;
+        let zz2 = (zz1 >> 64) + u128::from(x22p);
+        let x2 = zz2 as u64;
+        let zz3 = (zz2 >> 64) + u128::from(x33p);
+        let x3 = (zz3 as u64) & UMASK63;
+
+        let result = Fe25519 { x3, x2, x1, x0 };
 
         debug_assert!(
             (result.x3 != 0x7FFF_FFFF_FFFF_FFFF)
@@ -122,9 +179,9 @@ impl ops::Mul<Fe25519> for Fe25519 {
         let t11 = x1mx1 as u64;
         let x1mx2 = u128::from(self.x1) * u128::from(_rhs.x2) + (x1mx1 >> 64) + u128::from(t03);
         let t12 = x1mx2 as u64;
-        let x1m3 = u128::from(self.x1) * u128::from(_rhs.x3) + (x1mx2 >> 64) + u128::from(t04);
-        let t13 = x1m3 as u64;
-        let t14 = (x1m3 >> 64) as u64;
+        let x1mx3 = u128::from(self.x1) * u128::from(_rhs.x3) + (x1mx2 >> 64) + u128::from(t04);
+        let t13 = x1mx3 as u64;
+        let t14 = (x1mx3 >> 64) as u64;
 
         let x2mx0 = u128::from(self.x2) * u128::from(_rhs.x0) + u128::from(t11);
         let t20 = x2mx0 as u64;
@@ -164,8 +221,7 @@ impl ops::Mul<Fe25519> for Fe25519 {
         let w02 = u128::from(s20) + (w01 >> 64);
         let x2 = w02 as u64;
         let w03 = u128::from(s30) + (w02 >> 64);
-        let mut x3 = w03 as u64;
-        x3 &= UMASK63;
+        let x3 = w03 as u64 & UMASK63;
 
         // We could still be above 2**255 - 19; increment and see if we rollover
         let i0 = u128::from(x0) + 19;
@@ -180,6 +236,53 @@ impl ops::Mul<Fe25519> for Fe25519 {
             x2: !rollover & x2 | rollover & (i2 as u64),
             x1: !rollover & x1 | rollover & (i1 as u64),
             x0: !rollover & x0 | rollover & (i0 as u64),
+        };
+
+        debug_assert!(
+            (result.x3 != 0x7FFF_FFFF_FFFF_FFFF)
+                | (result.x2 != 0xFFFF_FFFF_FFFF_FFFF)
+                | (result.x1 != 0xFFFF_FFFF_FFFF_FFFF)
+                | (result.x0 < 0xFFFF_FFFF_FFFF_FFED)
+        );
+        result
+    }
+}
+
+impl Fe25519 {
+    fn mul_121665(&self) -> Fe25519 {
+        debug_assert!(
+            (self.x3 != 0x7FFF_FFFF_FFFF_FFFF)
+                | (self.x2 != 0xFFFF_FFFF_FFFF_FFFF)
+                | (self.x1 != 0xFFFF_FFFF_FFFF_FFFF)
+                | (self.x0 < 0xFFFF_FFFF_FFFF_FFED)
+        );
+
+        // multiply by 121665 and propagate carries
+        let x0mx0 = u128::from(self.x0) * 121_665;
+        let t00 = x0mx0 as u64;
+        let x0mx1 = u128::from(self.x1) * 121_665 + (x0mx0 >> 64);
+        let t01 = x0mx1 as u64;
+        let x0mx2 = u128::from(self.x2) * 121_665 + (x0mx1 >> 64);
+        let t02 = x0mx2 as u64;
+        let x0mx3 = u128::from(self.x3) * 121_665 + (x0mx2 >> 64);
+        let t03 = x0mx3 as u64;
+        //let t04 = (x0mx3 >> 63) as u64;
+
+        // reduce 2**255 = 19
+        let x00 = u128::from(t00) + 19 * (x0mx3 >> 63);
+        let s00 = x00 as u64;
+        let x01 = u128::from(t01) + (x00 >> 64);
+        let s01 = x01 as u64;
+        let x02 = u128::from(t02) + (x01 >> 64);
+        let s02 = x02 as u64;
+        let x03 = u128::from(t03) + (x02 >> 64);
+        let s03 = x03 as u64;
+
+        let result = Fe25519 {
+            x3: UMASK63 & s03,
+            x2: s02,
+            x1: s01,
+            x0: s00,
         };
 
         debug_assert!(
