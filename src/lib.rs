@@ -1,26 +1,25 @@
 #![deny(clippy::all)]
 
+// See: https://tools.ietf.org/html/rfc7748
+
 // TODO:
-//   1. Double check random number generator (should be fine)
 //   2. Implement cswap and other oddities
 //   3. General clean up; clippy; lint messages
 //   4. Implement scalar montgomery via RFC 7748 and/or "Montgomery's original paper"
 
 #[macro_use]
 extern crate lazy_static;
-extern crate regex;
-
-use std::ops;
 
 use crate::support::check_size;
 
 mod support;
+
 #[cfg(test)]
 mod tests;
 
 const UMASK63: u64 = (1 << 63) - 1; // 0x7FFF_FFFF_FFFF_FFFF
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone, Copy, Default)]
 pub struct Fe25519 {
     // 63+64+64+64=255; x3 is MSB
     x3: u64,
@@ -84,29 +83,15 @@ fn fe_sub(dest: &mut Fe25519, src1: &Fe25519, src2: &Fe25519) {
 
     let x0_sub_x0 = u128::from(src1.x0).overflowing_sub(u128::from(src2.x0)).0; // .0 is result
     let sub_x0 = x0_sub_x0 as u64;
-    let x1_sub_x1 = u128::from(src1.x1)
-        .overflowing_sub(u128::from(src2.x1))
-        .0
-        .overflowing_sub(x0_sub_x0 >> 127)
-        .0;
+    let x1_sub_x1 = u128::from(src1.x1).overflowing_sub(u128::from(src2.x1)).0.overflowing_sub(x0_sub_x0 >> 127).0;
     let sub_x1 = x1_sub_x1 as u64;
-    let x2_sub_x2 = u128::from(src1.x2)
-        .overflowing_sub(u128::from(src2.x2))
-        .0
-        .overflowing_sub(x1_sub_x1 >> 127)
-        .0;
+    let x2_sub_x2 = u128::from(src1.x2).overflowing_sub(u128::from(src2.x2)).0.overflowing_sub(x1_sub_x1 >> 127).0;
     let sub_x2 = x2_sub_x2 as u64;
-    let x3_sub_x3 = u128::from(src1.x3)
-        .overflowing_sub(u128::from(src2.x3))
-        .0
-        .overflowing_sub(x2_sub_x2 >> 127)
-        .0;
+    let x3_sub_x3 = u128::from(src1.x3).overflowing_sub(u128::from(src2.x3)).0.overflowing_sub(x2_sub_x2 >> 127).0;
     let sub_x3 = x3_sub_x3 as u64;
 
     // If carry set, we decrement another 19
-    let x0_dec_19 = u128::from(sub_x0)
-        .overflowing_sub(u128::from(sub_x3 >> 63) * 19)
-        .0;
+    let x0_dec_19 = u128::from(sub_x0).overflowing_sub(u128::from(sub_x3 >> 63) * 19).0;
     dest.x0 = x0_dec_19 as u64;
     let x1_dec_19 = (x0_dec_19 >> 64) + u128::from(sub_x1);
     dest.x1 = x1_dec_19 as u64;
@@ -135,40 +120,31 @@ fn fe_mul(dest: &mut Fe25519, src1: &Fe25519, src2: &Fe25519) {
 
     let x1_mul_x0 = u128::from(src1.x1) * u128::from(src2.x0) + u128::from(mul_x01);
     let mul_x10 = x1_mul_x0 as u64;
-    let x1_mul_x1 =
-        u128::from(src1.x1) * u128::from(src2.x1) + (x1_mul_x0 >> 64) + u128::from(mul_x02);
+    let x1_mul_x1 = u128::from(src1.x1) * u128::from(src2.x1) + (x1_mul_x0 >> 64) + u128::from(mul_x02);
     let mul_x11 = x1_mul_x1 as u64;
-    let x1_mul_x2 =
-        u128::from(src1.x1) * u128::from(src2.x2) + (x1_mul_x1 >> 64) + u128::from(mul_x03);
+    let x1_mul_x2 = u128::from(src1.x1) * u128::from(src2.x2) + (x1_mul_x1 >> 64) + u128::from(mul_x03);
     let mu_x12 = x1_mul_x2 as u64;
-    let x1_mul_x3 =
-        u128::from(src1.x1) * u128::from(src2.x3) + (x1_mul_x2 >> 64) + u128::from(mul_x04);
+    let x1_mul_x3 = u128::from(src1.x1) * u128::from(src2.x3) + (x1_mul_x2 >> 64) + u128::from(mul_x04);
     let mul_x13 = x1_mul_x3 as u64;
     let mul_x14 = (x1_mul_x3 >> 64) as u64;
 
     let x2_mul_x0 = u128::from(src1.x2) * u128::from(src2.x0) + u128::from(mul_x11);
     let mul_x20 = x2_mul_x0 as u64;
-    let x2_mul_x1 =
-        u128::from(src1.x2) * u128::from(src2.x1) + (x2_mul_x0 >> 64) + u128::from(mu_x12);
+    let x2_mul_x1 = u128::from(src1.x2) * u128::from(src2.x1) + (x2_mul_x0 >> 64) + u128::from(mu_x12);
     let mul_x21 = x2_mul_x1 as u64;
-    let x2_mul_x2 =
-        u128::from(src1.x2) * u128::from(src2.x2) + (x2_mul_x1 >> 64) + u128::from(mul_x13);
+    let x2_mul_x2 = u128::from(src1.x2) * u128::from(src2.x2) + (x2_mul_x1 >> 64) + u128::from(mul_x13);
     let mul_x22 = x2_mul_x2 as u64;
-    let x2_mul_x3 =
-        u128::from(src1.x2) * u128::from(src2.x3) + (x2_mul_x2 >> 64) + u128::from(mul_x14);
+    let x2_mul_x3 = u128::from(src1.x2) * u128::from(src2.x3) + (x2_mul_x2 >> 64) + u128::from(mul_x14);
     let mul_x23 = x2_mul_x3 as u64;
     let mul_x24 = (x2_mul_x3 >> 64) as u64;
 
     let x3_mul_x0 = u128::from(src1.x3) * u128::from(src2.x0) + u128::from(mul_x21);
     let mul_x30 = x3_mul_x0 as u64;
-    let x3_mul_x1 =
-        u128::from(src1.x3) * u128::from(src2.x1) + (x3_mul_x0 >> 64) + u128::from(mul_x22);
+    let x3_mul_x1 = u128::from(src1.x3) * u128::from(src2.x1) + (x3_mul_x0 >> 64) + u128::from(mul_x22);
     let mul_x31 = x3_mul_x1 as u64;
-    let x3_mul_x2 =
-        u128::from(src1.x3) * u128::from(src2.x2) + (x3_mul_x1 >> 64) + u128::from(mul_x23);
+    let x3_mul_x2 = u128::from(src1.x3) * u128::from(src2.x2) + (x3_mul_x1 >> 64) + u128::from(mul_x23);
     let mul_x32 = x3_mul_x2 as u64;
-    let x3_mul_x3 =
-        u128::from(src1.x3) * u128::from(src2.x3) + (x3_mul_x2 >> 64) + u128::from(mul_x24);
+    let x3_mul_x3 = u128::from(src1.x3) * u128::from(src2.x3) + (x3_mul_x2 >> 64) + u128::from(mul_x24);
     let mul_x33 = x3_mul_x3 as u64;
     let mul_x34 = (x3_mul_x3 >> 64) as u64;
 
@@ -208,17 +184,17 @@ fn fe_mul(dest: &mut Fe25519, src1: &Fe25519, src2: &Fe25519) {
     debug_assert!(check_size(&dest));
 }
 
-fn fe_mul_121665(dest: &mut Fe25519) {
+fn fe_mul_121665(dest: &mut Fe25519, src: &Fe25519) {
     debug_assert!(check_size(&dest));
 
     // multiply by 121665 and propagate carries
-    let x0_mul_12 = u128::from(dest.x0) * 121_665;
+    let x0_mul_12 = u128::from(src.x0) * 121_665;
     let mul_x0 = x0_mul_12 as u64;
-    let x1_mul_12 = u128::from(dest.x1) * 121_665 + (x0_mul_12 >> 64);
+    let x1_mul_12 = u128::from(src.x1) * 121_665 + (x0_mul_12 >> 64);
     let mul_x1 = x1_mul_12 as u64;
-    let x2_mul_12 = u128::from(dest.x2) * 121_665 + (x1_mul_12 >> 64);
+    let x2_mul_12 = u128::from(src.x2) * 121_665 + (x1_mul_12 >> 64);
     let mul_x2 = x2_mul_12 as u64;
-    let x3_mul_12 = u128::from(dest.x3) * 121_665 + (x2_mul_12 >> 64);
+    let x3_mul_12 = u128::from(src.x3) * 121_665 + (x2_mul_12 >> 64);
     let mul_x3 = x3_mul_12 as u64;
     //let t04 = (x0mx3 >> 63) as u64;
 
@@ -232,7 +208,7 @@ fn fe_mul_121665(dest: &mut Fe25519) {
     let x3_inc_19 = u128::from(mul_x3) + (x2_inc_19 >> 64);
     let inc_x3 = x3_inc_19 as u64;
 
-    // Seems like we need a rollover check here ?!?!?
+    // Seems like we need a rollover check here too ?!?!?
 
     dest.x3 = UMASK63 & inc_x3;
     dest.x2 = inc_x2;
@@ -240,4 +216,101 @@ fn fe_mul_121665(dest: &mut Fe25519) {
     dest.x0 = inc_x0;
 
     debug_assert!(check_size(&dest));
+}
+
+//cswap(swap, x_2, x_3):
+//dummy = mask(swap) AND (x_2 XOR x_3)
+//x_2 = x_2 XOR dummy
+//x_3 = x_3 XOR dummy
+//Return (x_2, x_3)
+
+fn fe_cswap(swap: &Fe25519, x_2: &mut Fe25519, x_3: &mut Fe25519) {
+    let dummy = Fe25519 {
+        x3: swap.x3 & (x_2.x3 ^ x_3.x3),
+        x2: swap.x2 & (x_2.x2 ^ x_3.x2),
+        x1: swap.x1 & (x_2.x1 ^ x_3.x1),
+        x0: swap.x0 & (x_2.x0 ^ x_3.x0),
+    };
+    x_2.x3 ^= dummy.x3;
+    x_2.x2 ^= dummy.x2;
+    x_2.x1 ^= dummy.x1;
+    x_2.x0 ^= dummy.x0;
+    x_3.x3 ^= dummy.x3;
+    x_3.x2 ^= dummy.x2;
+    x_3.x1 ^= dummy.x1;
+    x_3.x0 ^= dummy.x0;
+}
+
+// To be optimized away...
+fn k_t(k: &Fe25519, t: u8) -> Fe25519 {
+    //= (k >> t) & 1
+    let x0: u64;
+    // match against range is experimental, so use if-else-etc
+    if t <= 63 {
+        x0 = k.x0 >> u64::from(t);
+    } else if (t >= 64) & (t <= 127) {
+        x0 = k.x1 >> (u64::from(t) - 64);
+    } else if (t >= 128) & (t <= 191) {
+        x0 = k.x2 >> (u64::from(t) - 128);
+    } else {
+        x0 = k.x3 >> (u64::from(t) - 192);
+    }
+    Fe25519 { x3: 0, x2: 0, x1: 0, x0 }
+}
+
+#[allow(non_snake_case)]
+fn mul(k: &Fe25519, u: Fe25519) -> Fe25519 {
+    let x_1 = u; // x_1 = u
+    let mut x_2 = Fe25519 { x3: 0, x2: 0, x1: 0, x0: 1 }; // x_2 = 1
+    let mut z_2 = Fe25519 { x3: 0, x2: 0, x1: 0, x0: 0 }; // z_2 = 0
+    let mut x_3 = u; //x_3 = u
+    let mut z_3 = Fe25519 { x3: 0, x2: 0, x1: 0, x0: 1 }; //z_3 = 1
+    let mut swap = Fe25519 { x3: 0, x2: 0, x1: 0, x0: 0 }; //swap = 0
+    let mut A = Fe25519::default();
+    let mut AA = Fe25519::default();
+    let mut B = Fe25519::default();
+    let mut BB = Fe25519::default();
+    let mut C = Fe25519::default();
+    let mut CB = Fe25519::default();
+    let mut D = Fe25519::default();
+    let mut DA = Fe25519::default();
+    let mut E = Fe25519::default();
+    let mut t1 = Fe25519::default();
+    let mut t2 = Fe25519::default();
+    let mut t3 = Fe25519::default();
+    let mut t4 = Fe25519::default();
+    let mut t5 = Fe25519::default();
+
+    for t in (0..(254u8 - 1)).rev() {
+        //                                  For t = bits-1 down to 0:
+        let k_t = k_t(&k, t); //                k_t = (k >> t) & 1
+        swap.x3 ^= k_t.x3; //                   swap ^= k_t
+        swap.x2 ^= k_t.x2;
+        swap.x1 ^= k_t.x1;
+        swap.x0 ^= k_t.x0;
+        fe_cswap(&swap, &mut x_2, &mut x_3); // (x_2, x_3) = cswap(swap, x_2, x_3)
+        fe_cswap(&swap, &mut z_2, &mut z_3); // (z_2, z_3) = cswap(swap, z_2, z_3)
+        swap = k_t; //                          swap = k_t
+        fe_add(&mut A, &x_2, &z_2); //          A = x_2 + z_2
+        fe_mul(&mut AA, &A, &A); //             AA = A^2
+        fe_sub(&mut B, &x_2, &z_2); //          B = x_2 - z_2
+        fe_mul(&mut BB, &B, &B); //             BB = B^2
+        fe_sub(&mut E, &AA, &BB); //            E = AA - BB
+        fe_add(&mut C, &x_3, &z_3); //          C = x_3 + z_3
+        fe_sub(&mut D, &x_3, &z_3); //          D = x_3 - z_3
+        fe_mul(&mut DA, &D, &A); //             DA = D * A
+        fe_mul(&mut CB, &C, &B); //             CB = C * B
+        fe_add(&mut t1, &DA, &CB); //           x_3 = (DA + CB)^2
+        fe_mul(&mut x_3, &t1, &t1);
+        fe_sub(&mut t2, &DA, &CB); //           z_3 = x_1 * (DA - CB)^2
+        fe_mul(&mut t3, &t2, &t2);
+        fe_mul(&mut z_3, &x_1, &t3);
+        fe_mul(&mut x_2, &AA, &BB); //          x_2 = AA * BB
+        fe_mul_121665(&mut t4, &E);
+        fe_add(&mut t5, &AA, &t4); //           z_2 = E * (AA + a24 * E)
+        fe_mul(&mut z_2, &E, &t5);
+    }
+    fe_cswap(&swap, &mut x_2, &mut x_3); // (x_2, x_3) = cswap(swap, x_2, x_3)
+    fe_cswap(&swap, &mut z_2, &mut z_3); // (z_2, z_3) = cswap(swap, z_2, z_3)
+    swap //  -->  Return x_2 * (z_2^(p - 2))  --> FIX ME  // Need to implement fast square (eventually)
 }

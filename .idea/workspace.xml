@@ -13,6 +13,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5d6280e8-31c4-49f3-828d-fd86ce7cc2bf" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/rustfmt.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/support.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/support.rs" afterDir="false" />
@@ -48,7 +49,8 @@
     <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
     <property name="nodejs_npm_path_reset_for_default_project" value="true" />
     <property name="org.rust.cargo.project.model.PROJECT_DISCOVERY" value="true" />
-    <property name="settings.editor.selected.configurable" value="Debugger.ObjectiveC" />
+    <property name="run.code.analysis.last.selected.profile" value="pProject Default" />
+    <property name="settings.editor.selected.configurable" value="language.rust.rustfmt" />
   </component>
   <component name="RunDashboard">
     <option name="ruleStates">
@@ -72,7 +74,9 @@
       <option name="backtrace" value="SHORT" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <envs />
-      <method v="2" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
     </configuration>
     <recent_temporary>
       <list>
@@ -97,6 +101,8 @@
       <workItem from="1564437177693" duration="83614000" />
       <workItem from="1565301640868" duration="602000" />
       <workItem from="1567535959798" duration="19151000" />
+      <workItem from="1567605159069" duration="727000" />
+      <workItem from="1567606365017" duration="11478000" />
     </task>
     <task id="LOCAL-00001" summary="initial commit">
       <created>1564537894140</created>

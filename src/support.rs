@@ -10,21 +10,13 @@ use crate::Fe25519;
 
 impl fmt::Display for Fe25519 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "0x{:016x}-{:016x}-{:016x}-{:016x}",
-            self.x3, self.x2, self.x1, self.x0
-        )
+        write!(f, "0x{:016x}-{:016x}-{:016x}-{:016x}", self.x3, self.x2, self.x1, self.x0)
     }
 }
 
 impl fmt::Debug for Fe25519 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "0x{:016x}-{:016x}-{:016x}-{:016x}",
-            self.x3, self.x2, self.x1, self.x0
-        )
+        write!(f, "0x{:016x}-{:016x}-{:016x}-{:016x}", self.x3, self.x2, self.x1, self.x0)
     }
 }
 
@@ -73,9 +65,7 @@ impl FromStr for Fe25519 {
 pub fn check_size(src: &Fe25519) -> bool {
     if (src.x3 < 0x7FFF_FFFF_FFFF_FFFF)
         | ((src.x3 == 0x7FFF_FFFF_FFFF_FFFF)
-        & ((src.x2 < 0xFFFF_FFFF_FFFF_FFFF)
-        | (src.x1 < 0xFFFF_FFFF_FFFF_FFFF)
-        | (src.x0 < 0xFFFF_FFFF_FFFF_FFED)))
+        & ((src.x2 < 0xFFFF_FFFF_FFFF_FFFF) | (src.x1 < 0xFFFF_FFFF_FFFF_FFFF) | (src.x0 < 0xFFFF_FFFF_FFFF_FFED)))
     {
         true
     } else {
