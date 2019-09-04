@@ -1,6 +1,5 @@
 #![deny(clippy::all)]
 
-
 use std::fmt;
 use std::num::ParseIntError;
 use std::str::FromStr;
@@ -68,5 +67,19 @@ impl FromStr for Fe25519 {
             (_, _, _, Err(e)) => return Err(self::ParseError::ParseErrorX0(e)),
         };
         Ok(Fe25519 { x3, x2, x1, x0 })
+    }
+}
+
+pub fn check_size(src: &Fe25519) -> bool {
+    if (src.x3 < 0x7FFF_FFFF_FFFF_FFFF)
+        | ((src.x3 == 0x7FFF_FFFF_FFFF_FFFF)
+        & ((src.x2 < 0xFFFF_FFFF_FFFF_FFFF)
+        | (src.x1 < 0xFFFF_FFFF_FFFF_FFFF)
+        | (src.x0 < 0xFFFF_FFFF_FFFF_FFED)))
+    {
+        true
+    } else {
+        println!("Oversize value encountered: {}", src);
+        false
     }
 }

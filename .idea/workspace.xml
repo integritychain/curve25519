@@ -15,6 +15,7 @@
     <list default="true" id="5d6280e8-31c4-49f3-828d-fd86ce7cc2bf" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/support.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/support.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/tests.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/tests.rs" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -81,6 +82,7 @@
   </component>
   <component name="RustProjectSettings">
     <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
+    <option name="version" value="2" />
   </component>
   <component name="SvnConfiguration">
     <configuration />
@@ -92,7 +94,9 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1564437176618</updated>
-      <workItem from="1564437177693" duration="82148000" />
+      <workItem from="1564437177693" duration="83614000" />
+      <workItem from="1565301640868" duration="602000" />
+      <workItem from="1567535959798" duration="19151000" />
     </task>
     <task id="LOCAL-00001" summary="initial commit">
       <created>1564537894140</created>
@@ -129,7 +133,14 @@
       <option name="project" value="LOCAL" />
       <updated>1565049764213</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="add/mult/sub/mult_121665/reduce working">
+      <created>1565228127384</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1565228127384</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -140,7 +151,9 @@
       <map>
         <entry key="MAIN">
           <value>
-            <State />
+            <State>
+              <option name="COLUMN_ORDER" />
+            </State>
           </value>
         </entry>
       </map>
@@ -154,7 +167,8 @@
     <MESSAGE value="reduce almost working" />
     <MESSAGE value="progress on reduce inside add" />
     <MESSAGE value="add/mult/reduce working" />
-    <option name="LAST_COMMIT_MESSAGE" value="add/mult/reduce working" />
+    <MESSAGE value="add/mult/sub/mult_121665/reduce working" />
+    <option name="LAST_COMMIT_MESSAGE" value="add/mult/sub/mult_121665/reduce working" />
     <option name="OPTIMIZE_IMPORTS_BEFORE_PROJECT_COMMIT" value="true" />
     <option name="REFORMAT_BEFORE_PROJECT_COMMIT" value="true" />
     <option name="REARRANGE_BEFORE_PROJECT_COMMIT" value="true" />
