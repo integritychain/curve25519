@@ -3,9 +3,9 @@
 // See: https://tools.ietf.org/html/rfc7748
 
 // TODO:
-//   2. Implement cswap and other oddities
 //   3. General clean up; clippy; lint messages
 //   4. Implement scalar montgomery via RFC 7748 and/or "Montgomery's original paper"
+//   5. Add logic to gimme number for middle 0xFFFFF
 
 #[macro_use]
 extern crate lazy_static;
@@ -184,6 +184,140 @@ fn fe_mul(dest: &mut Fe25519, src1: &Fe25519, src2: &Fe25519) {
     debug_assert!(check_size(&dest));
 }
 
+fn fe_square(dest: &mut Fe25519) {
+    debug_assert!(check_size(&dest));
+
+    // for each src1.X multiply and sum src2 (4 'paragraphs')
+    let x0_mul_x0 = u128::from(dest.x0) * u128::from(dest.x0);
+    let x0_mul_x1 = u128::from(dest.x0) * u128::from(dest.x1);
+    let x0_mul_x2 = u128::from(dest.x0) * u128::from(dest.x2);
+    let x0_mul_x3 = u128::from(dest.x0) * u128::from(dest.x3);
+    let x1_mul_x1 = u128::from(dest.x1) * u128::from(dest.x1);
+    let x1_mul_x2 = u128::from(dest.x1) * u128::from(dest.x2);
+    let x1_mul_x3 = u128::from(dest.x1) * u128::from(dest.x3);
+    let x2_mul_x2 = u128::from(dest.x2) * u128::from(dest.x2);
+    let x2_mul_x3 = u128::from(dest.x2) * u128::from(dest.x3);
+    let x3_mul_x3 = u128::from(dest.x3) * u128::from(dest.x3);
+
+    let scan_1 = (x0_mul_x0 >> 64) + 2 * u128::from(x0_mul_x1 as u64);
+    let scan_2 = 2 * (x0_mul_x1 >> 64) + 2 * u128::from(x0_mul_x2 as u64) + u128::from(x1_mul_x1 as u64) + (scan_1 >> 64);
+    let scan_3 = 2 * (x0_mul_x2 >> 64) + (x1_mul_x1 >> 64) + 2 * u128::from(x0_mul_x3 as u64) + 2 * u128::from(x1_mul_x2 as u64) + (scan_2 >> 64);
+    let scan_4 = 2 * (x0_mul_x3 >> 64) + 2 * (x1_mul_x2 >> 64) + u128::from(x2_mul_x2 as u64) + 2 * u128::from(x1_mul_x3 as u64) + (scan_3 >> 64);
+    let scan_5 = 2 * (x1_mul_x3 >> 64) + (x2_mul_x2 >> 64) + 2 * u128::from(x2_mul_x3 as u64) + (scan_4 >> 64);
+    let scan_6 = 2 * (x2_mul_x3 >> 64) + u128::from(x3_mul_x3 as u64) + (scan_5 >> 64);
+
+    let mul_0 = x0_mul_x0 as u64;
+    let mul_1 = scan_1 as u64;
+    let mul_2 = scan_2 as u64;
+    let mul_3 = scan_3 as u64;
+    let mul_4 = scan_4 as u64;
+    let mul_5 = scan_5 as u64;
+    let mul_6 = scan_6 as u64;
+    let mul_7 = (x3_mul_x3 >> 64) + (scan_6 >> 64);
+
+
+    // Reduce t00..t30 by taking 2**256=38
+    let x00_red_38 = u128::from(mul_0) + (u128::from(mul_4) * 38);
+    let red_x00 = x00_red_38 as u64;
+    let x10_red_38 = u128::from(mul_1) + (u128::from(mul_5) * 38) + (x00_red_38 >> 64);
+    let red_x10 = x10_red_38 as u64;
+    let x20_red_38 = u128::from(mul_2) + (u128::from(mul_6) * 38) + (x10_red_38 >> 64);
+    let red_x20 = x20_red_38 as u64;
+    let x30_red_38 = u128::from(mul_3) + (u128::from(mul_7) * 38) + (x20_red_38 >> 64);
+    let red_x30 = x30_red_38 as u64;
+
+    // If MSB is set add 19
+    let x00_inc_19 = u128::from(red_x00) + (x30_red_38 >> 63) as u128 * 19;
+    let inc_x00 = x00_inc_19 as u64;
+    let x10_inc_19 = u128::from(red_x10) + (x00_inc_19 >> 64);
+    let inc_x10 = x10_inc_19 as u64;
+    let x20_inc_19 = u128::from(red_x20) + (x10_inc_19 >> 64);
+    let inc_x20 = x20_inc_19 as u64;
+    let x30_inc_19 = u128::from(red_x30) + (x20_inc_19 >> 64);
+    let inc_x30 = x30_inc_19 as u64 & UMASK63;
+
+    // We could still be above 2**255 - 19; increment and see if we rollover
+    let x00_roll_19 = u128::from(inc_x00) + 19;
+    let x10_roll_19 = (x00_roll_19 >> 64) + u128::from(inc_x10);
+    let x20_roll_19 = (x10_roll_19 >> 64) + u128::from(inc_x20);
+    let x30_roll_19 = (x20_roll_19 >> 64) + u128::from(inc_x30);
+    let rollover = 0u64.overflowing_sub((x30_roll_19 >> 63) as u64).0; // extend 1111... or 0000...
+
+    // If no rollover take the original value, otherwise take the 'roll by 19'
+    dest.x3 = UMASK63 & (!rollover & inc_x30 | rollover & (x30_roll_19 as u64));
+    dest.x2 = !rollover & inc_x20 | rollover & (x20_roll_19 as u64);
+    dest.x1 = !rollover & inc_x10 | rollover & (x10_roll_19 as u64);
+    dest.x0 = !rollover & inc_x00 | rollover & (x00_roll_19 as u64);
+    
+    debug_assert!(check_size(&dest));
+}
+
+fn fe_square2(dest: &mut Fe25519) {
+    debug_assert!(check_size(&dest));
+
+    // for each src1.X multiply and sum src2 (4 'paragraphs')
+    let x0_mul_x0 = u128::from(dest.x0) * u128::from(dest.x0);
+    let mul_x00 = x0_mul_x0 as u64;
+
+    let x0_mul_x1 = 2 * (u128::from(dest.x0) * u128::from(dest.x1)) + (x0_mul_x0 >> 64);
+    let mul_x01 = x0_mul_x1 as u64;
+
+    let x0_mul_x2 = (2 * u128::from(dest.x0) * u128::from(dest.x2)) +
+        u128::from(dest.x1) * u128::from(dest.x1) + (x0_mul_x1 >> 64);
+    let mul_x02 = x0_mul_x2 as u64;
+
+    let x0_mul_x3 = (2 * u128::from(dest.x0) * u128::from(dest.x3)) +
+        (2 * u128::from(dest.x1) * u128::from(dest.x2)) + (x0_mul_x2 >> 64);
+    let mul_x03 = x0_mul_x3 as u64;
+
+    let x0_mul_x4 = (2 * u128::from(dest.x1) * u128::from(dest.x3)) +
+        u128::from(dest.x2) * u128::from(dest.x2) + (x0_mul_x3 >> 64);
+    let mul_x04 = x0_mul_x4 as u64;
+
+    let x0_mul_x5 = (2 * u128::from(dest.x2) * u128::from(dest.x3)) + (x0_mul_x4 >> 64);
+    let mul_x05 = x0_mul_x5 as u64;
+
+    let x0_mul_x6 = u128::from(dest.x3) * u128::from(dest.x3) + (x0_mul_x5 >> 64);
+    let mul_x06 = x0_mul_x6 as u64;
+    let mul_x07 = (x0_mul_x6 >> 64) as u64;
+
+    // Reduce t00..t30 by taking 2**256=38
+    let x00_red_38 = u128::from(mul_x00) + (u128::from(mul_x04) * 38);
+    let red_x00 = x00_red_38 as u64;
+    let x10_red_38 = u128::from(mul_x01) + (u128::from(mul_x05) * 38) + (x00_red_38 >> 64);
+    let red_x10 = x10_red_38 as u64;
+    let x20_red_38 = u128::from(mul_x02) + (u128::from(mul_x06) * 38) + (x10_red_38 >> 64);
+    let red_x20 = x20_red_38 as u64;
+    let x30_red_38 = u128::from(mul_x03) + (u128::from(mul_x07) * 38) + (x20_red_38 >> 64);
+    let red_x30 = x30_red_38 as u64;
+
+    // If MSB is set add 19
+    let x00_inc_19 = u128::from(red_x00) + (x30_red_38 >> 63) as u128 * 19;
+    let inc_x00 = x00_inc_19 as u64;
+    let x10_inc_19 = u128::from(red_x10) + (x00_inc_19 >> 64);
+    let inc_x10 = x10_inc_19 as u64;
+    let x20_inc_19 = u128::from(red_x20) + (x10_inc_19 >> 64);
+    let inc_x20 = x20_inc_19 as u64;
+    let x30_inc_19 = u128::from(red_x30) + (x20_inc_19 >> 64);
+    let inc_x30 = x30_inc_19 as u64 & UMASK63;
+
+    // We could still be above 2**255 - 19; increment and see if we rollover
+    let x00_roll_19 = u128::from(inc_x00) + 19;
+    let x10_roll_19 = (x00_roll_19 >> 64) + u128::from(inc_x10);
+    let x20_roll_19 = (x10_roll_19 >> 64) + u128::from(inc_x20);
+    let x30_roll_19 = (x20_roll_19 >> 64) + u128::from(inc_x30);
+    let rollover = 0u64.overflowing_sub((x30_roll_19 >> 63) as u64).0; // extend 1111... or 0000...
+
+    // If no rollover take the original value, otherwise take the 'roll by 19'
+    dest.x3 = UMASK63 & (!rollover & inc_x30 | rollover & (x30_roll_19 as u64));
+    dest.x2 = !rollover & inc_x20 | rollover & (x20_roll_19 as u64);
+    dest.x1 = !rollover & inc_x10 | rollover & (x10_roll_19 as u64);
+    dest.x0 = !rollover & inc_x00 | rollover & (x00_roll_19 as u64);
+
+    debug_assert!(check_size(&dest));
+}
+
+
 fn fe_mul_121665(dest: &mut Fe25519, src: &Fe25519) {
     debug_assert!(check_size(&dest));
 
@@ -217,12 +351,6 @@ fn fe_mul_121665(dest: &mut Fe25519, src: &Fe25519) {
 
     debug_assert!(check_size(&dest));
 }
-
-//cswap(swap, x_2, x_3):
-//dummy = mask(swap) AND (x_2 XOR x_3)
-//x_2 = x_2 XOR dummy
-//x_3 = x_3 XOR dummy
-//Return (x_2, x_3)
 
 fn fe_cswap(swap: &Fe25519, x_2: &mut Fe25519, x_3: &mut Fe25519) {
     let dummy = Fe25519 {
@@ -258,6 +386,104 @@ fn k_t(k: &Fe25519, t: u8) -> Fe25519 {
     Fe25519 { x3: 0, x2: 0, x1: 0, x0 }
 }
 
+/**************************
+fn fe_invert(result: &mut Fe25519, z: &Fe25519) {
+    // Let p = 2^255 - 19 and 1 = a^(p-1) mod p
+    // Then a^-1 = a^(p-2) which is a^(2^255 - 21)
+    // Now 2^255 - 21 is
+
+    let mut t0 = Fe25519::default();
+    let mut t1 = Fe25519::default();
+    let mut t2 = Fe25519::default();
+    let mut t3 = Fe25519::default();
+    let mut out = Fe25519::default();
+
+    //let i = 0u8;
+
+    /* t0 = z ** 2 */
+    fe_mul(&mut t0, &z, &z);
+
+    /* t1 = t0 ** (2 ** 2) = z ** 8 */
+    fe_mul(&mut t1, &t0, &t0);
+    fe_mul(&mut t1, &t1, &t1);
+
+    /* t1 = z * t1 = z ** 9 */
+    fe_mul(&mut t1, &z, &t1);
+    /* t0 = t0 * t1 = z ** 11 -- stash t0 away for the end. */
+    fe_mul(&mut t0, &t0, &t1);
+
+    /* t2 = t0 ** 2 = z ** 22 */
+    fe_mul(&mut t2, &t0, &t0);
+
+    /* t1 = t1 * t2 = z ** (2 ** 5 - 1) */
+    fe_mul(&mut t1, &t1, &t2);
+
+    /* t2 = t1 ** (2 ** 5) = z ** ((2 ** 5) * (2 ** 5 - 1)) */
+    fe_mul(&mut t2, &t1, &t1);
+    for _i in 1..5 { //= 1; i < 5; ++i)
+        fe_mul(&mut t2, &t2, &t2);
+    }
+
+    /* t1 = t1 * t2 = z ** ((2 ** 5 + 1) * (2 ** 5 - 1)) = z ** (2 ** 10 - 1) */
+    fe_mul(&mut t1, &t2, &t1);
+
+    /* Continuing similarly... */
+
+    /* t2 = z ** (2 ** 20 - 1) */
+    fe_mul(&mut t2, &t1, &t1);
+    for _i in 1..10 { //(i = 1; i < 10; ++i)
+        fe_mul(&mut t2, &t2, &t2);
+    }
+    fe_mul(&mut t2, &t2, &t1);
+
+    /* t2 = z ** (2 ** 40 - 1) */
+    fe_mul(&mut t3, &t2, &t2);
+    for _i in 1..20 { //(i = 1; i < 20; ++i)
+        fe_mul(&mut t3, &t3, &t3);
+    }
+    fe_mul(&mut t2, &t3, &t2);
+
+    /* t2 = z ** (2 ** 10) * (2 ** 40 - 1) */
+    for _i in 0..10 { //(i = 0; i < 10; ++i)
+        fe_mul(&mut t2, &t2, &t2);
+    }
+    /* t1 = z ** (2 ** 50 - 1) */
+    fe_mul(&mut t1, &t2, &t1);
+
+    /* t2 = z ** (2 ** 100 - 1) */
+    fe_mul(&mut t2, &t1, &t1);
+    for _i in 1..50 { //(i = 1; i < 50; ++i)
+        fe_mul(&mut t2, &t2, &t2);
+    }
+    fe_mul(&mut t2, &t2, &t1);
+
+    /* t2 = z ** (2 ** 200 - 1) */
+    fe_mul(&mut t3, &t2, &t2);
+    for _i in 1..100 { //(i = 1; i < 100; ++i)
+        fe_mul(&mut t3, &t3, &t3);
+    }
+
+    fe_mul(&mut t2, &t3, &t2);
+
+    /* t2 = z ** ((2 ** 50) * (2 ** 200 - 1) */
+    for _i in 0..50 { //(i = 0; i < 50; ++i)
+        fe_mul(&mut t2, &t2, &t2);
+    }
+
+    /* t1 = z ** (2 ** 250 - 1) */
+    fe_mul(&mut t1, &t2, &t1);
+
+    /* t1 = z ** ((2 ** 5) * (2 ** 250 - 1)) */
+    for _i in 0..5 { //(i = 0; i < 5; ++i)
+        fe_mul(&mut t1, &t1, &t1);
+    }
+    /* Recall t0 = z ** 11; out = z ** (2 ** 255 - 21) */
+    fe_mul(&mut out, &t1, &t0);
+
+    *result = Fe25519 { ..out };
+}
+**************************/
+
 #[allow(non_snake_case)]
 fn mul(k: &Fe25519, u: Fe25519) -> Fe25519 {
     let x_1 = u; // x_1 = u
@@ -282,15 +508,15 @@ fn mul(k: &Fe25519, u: Fe25519) -> Fe25519 {
     let mut t5 = Fe25519::default();
 
     for t in (0..(254u8 - 1)).rev() {
-        //                                  For t = bits-1 down to 0:
-        let k_t = k_t(&k, t); //                k_t = (k >> t) & 1
-        swap.x3 ^= k_t.x3; //                   swap ^= k_t
+        //                                                  For t = bits-1 down to 0:
+        let k_t = k_t(&k, t); //                       k_t = (k >> t) & 1
+        swap.x3 ^= k_t.x3; //                                   swap ^= k_t
         swap.x2 ^= k_t.x2;
         swap.x1 ^= k_t.x1;
         swap.x0 ^= k_t.x0;
-        fe_cswap(&swap, &mut x_2, &mut x_3); // (x_2, x_3) = cswap(swap, x_2, x_3)
-        fe_cswap(&swap, &mut z_2, &mut z_3); // (z_2, z_3) = cswap(swap, z_2, z_3)
-        swap = k_t; //                          swap = k_t
+        fe_cswap(&swap, &mut x_2, &mut x_3); //                 (x_2, x_3) = cswap(swap, x_2, x_3)
+        fe_cswap(&swap, &mut z_2, &mut z_3); //       (z_2, z_3) = cswap(swap, z_2, z_3)
+        swap = k_t; //                                          swap = k_t
         fe_add(&mut A, &x_2, &z_2); //          A = x_2 + z_2
         fe_mul(&mut AA, &A, &A); //             AA = A^2
         fe_sub(&mut B, &x_2, &z_2); //          B = x_2 - z_2
@@ -310,7 +536,7 @@ fn mul(k: &Fe25519, u: Fe25519) -> Fe25519 {
         fe_add(&mut t5, &AA, &t4); //           z_2 = E * (AA + a24 * E)
         fe_mul(&mut z_2, &E, &t5);
     }
-    fe_cswap(&swap, &mut x_2, &mut x_3); // (x_2, x_3) = cswap(swap, x_2, x_3)
-    fe_cswap(&swap, &mut z_2, &mut z_3); // (z_2, z_3) = cswap(swap, z_2, z_3)
+    fe_cswap(&swap, &mut x_2, &mut x_3); //                 (x_2, x_3) = cswap(swap, x_2, x_3)
+    fe_cswap(&swap, &mut z_2, &mut z_3); //       (z_2, z_3) = cswap(swap, z_2, z_3)
     swap //  -->  Return x_2 * (z_2^(p - 2))  --> FIX ME  // Need to implement fast square (eventually)
 }

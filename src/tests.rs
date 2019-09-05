@@ -27,7 +27,7 @@ fn gimme_number(bits: usize) -> BigUint {
             1 => BigUint::from_str("1").unwrap(),
             2 => BigUint::from_str("2").unwrap(),
             3 => BigUint::from_str("3").unwrap(),
-            4 => (&*TWO255M19).clone().sub(4 as u32),
+            4 => (&*TWO255M19).clone().sub(4 as u32), // Adjust matching for smaller bit widths
             5 => (&*TWO255M19).clone().sub(3 as u32),
             6 => (&*TWO255M19).clone().sub(2 as u32),
             7 => (&*TWO255M19).clone().sub(1 as u32),
@@ -84,6 +84,19 @@ fn text_fuzz_mul() {
         assert_eq!(mul_exp, mul_act);
     }
 }
+
+#[test]
+fn text_fuzz_square() {
+    for _index in 1..50_000 {
+        let a_exp = gimme_number(256);
+        //println!("{}", a_exp);
+        let sqr_exp = Fe25519::from_str(&format!("0x{:064x}", (&a_exp * &a_exp) % &*TWO255M19)).unwrap();
+        let mut sqr_act = Fe25519::from_str(&format!("0x{:064x}", a_exp)).unwrap();
+        fe_square(&mut sqr_act);
+        assert_eq!(sqr_exp, sqr_act);
+    }
+}
+
 
 #[test]
 fn text_fuzz_mul_121665() {
