@@ -1,35 +1,28 @@
 #![deny(clippy::all)]
 
-// See: https://tools.ietf.org/html/rfc7748
 
-// TODO:
-//   1. fuzz square
-//   2. General clean up; clippy; lint messages
-//   3. Finish mul
-//   5. Add logic to gimme number for middle 0xFFFFF
-
-#[macro_use]
-extern crate lazy_static;
+//#[macro_use]
+//extern crate lazy_static;
 
 use crate::support::check_size;
 
-mod support;
+//mod support;
 
-#[cfg(test)]
-mod tests;
+//#[cfg(test)]
+//mod tests;
 
 const UMASK63: u64 = (1 << 63) - 1; // 0x7FFF_FFFF_FFFF_FFFF
 
 #[derive(PartialEq, Clone, Copy, Default)]
 pub struct Fe25519 {
     // 63+64+64+64=255; x3 is MSB
-    x3: u64,
-    x2: u64,
-    x1: u64,
-    x0: u64,
+    pub x3: u64,
+    pub x2: u64,
+    pub x1: u64,
+    pub x0: u64,
 }
 
-fn fe_add(dest: &mut Fe25519, src1: &Fe25519, src2: &Fe25519) {
+pub(crate) fn fe_add(dest: &mut Fe25519, src1: &Fe25519, src2: &Fe25519) {
     // Check the inputs are less than 2**255 - 19
     debug_assert!(check_size(src1));
     debug_assert!(check_size(src2));
@@ -78,7 +71,7 @@ fn fe_add(dest: &mut Fe25519, src1: &Fe25519, src2: &Fe25519) {
 }
 
 // For a - b, if b > a then it wraps around 2*255 and we need to adjust by -19
-fn fe_sub(dest: &mut Fe25519, src1: &Fe25519, src2: &Fe25519) {
+pub(crate) fn fe_sub(dest: &mut Fe25519, src1: &Fe25519, src2: &Fe25519) {
     debug_assert!(check_size(&src1));
     debug_assert!(check_size(&src2));
 
@@ -104,7 +97,7 @@ fn fe_sub(dest: &mut Fe25519, src1: &Fe25519, src2: &Fe25519) {
     debug_assert!(check_size(&dest));
 }
 
-fn fe_mul(dest: &mut Fe25519, src1: &Fe25519, src2: &Fe25519) {
+pub fn fe_mul(dest: &mut Fe25519, src1: &Fe25519, src2: &Fe25519) {
     debug_assert!(check_size(&src1));
     debug_assert!(check_size(&src2));
 
@@ -185,7 +178,8 @@ fn fe_mul(dest: &mut Fe25519, src1: &Fe25519, src2: &Fe25519) {
     debug_assert!(check_size(&dest));
 }
 
-fn fe_square(dest: &mut Fe25519, src: &Fe25519) {
+#[inline]
+pub(crate) fn fe_square(dest: &mut Fe25519, src: &Fe25519) {
     debug_assert!(check_size(&dest));
 
     let x0_mul_x0 = u128::from(src.x0) * u128::from(src.x0);
@@ -251,7 +245,7 @@ fn fe_square(dest: &mut Fe25519, src: &Fe25519) {
     debug_assert!(check_size(&dest));
 }
 
-fn fe_mul_121665(dest: &mut Fe25519, src: &Fe25519) {
+pub(crate) fn fe_mul_121665(dest: &mut Fe25519, src: &Fe25519) {
     debug_assert!(check_size(&dest));
 
     // multiply by 121665 and propagate carries
@@ -305,10 +299,10 @@ fn fe_cswap(swap: &Fe25519, x_2: &mut Fe25519, x_3: &mut Fe25519) {
 // To be optimized away...
 fn k_t(k: &Fe25519, t: u8) -> Fe25519 {
     //= (k >> t) & 1
-    let x0: u64;
+    let mut x0: u64 = 0;
     // match against range is experimental, so use if-else-etc
     if t <= 63 {
-        x0 = k.x0 >> u64::from(t);
+        x0 = k.x0 >> t as u64;
     } else if (t >= 64) & (t <= 127) {
         x0 = k.x1 >> (u64::from(t) - 64);
     } else if (t >= 128) & (t <= 191) {
@@ -316,16 +310,15 @@ fn k_t(k: &Fe25519, t: u8) -> Fe25519 {
     } else {
         x0 = k.x3 >> (u64::from(t) - 192);
     }
-    Fe25519 { x3: 0, x2: 0, x1: 0, x0 }
+
+    if (x0 & 01) != 0 {
+        Fe25519 { x3: 0xFFFFFFFFFFFFFFFF, x2: 0xFFFFFFFFFFFFFFFF, x1: 0xFFFFFFFFFFFFFFFF, x0: 0xFFFFFFFFFFFFFFFF }
+    } else {
+        Fe25519 { x3: 0, x2: 0, x1: 0, x0: 0 }
+    }
 }
 
-fn fe_invert(result: &mut Fe25519, z: &Fe25519) {
-    let mut t0 = Fe25519::default();
-    let mut t1 = Fe25519::default();
-    let mut t2 = Fe25519::default();
-    let mut t3 = Fe25519::default();
-
-    /* t0 = z ** 2 */
+pub fn fe_invert(result: &mut Fe25519, z: &Fe25519) {
     let mut t0 = Fe25519::default();
     fe_square(&mut t0, &z);
 
@@ -343,6 +336,7 @@ fn fe_invert(result: &mut Fe25519, z: &Fe25519) {
     fe_mul(&mut t0, &xx2, &t1);
 
     /* t2 = t0 ** 2 = z ** 22 */
+    let mut t2 = Fe25519::default();
     fe_square(&mut t2, &t0);
 
     /* t1 = t1 * t2 = z ** (2 ** 5 - 1) */
@@ -375,6 +369,7 @@ fn fe_invert(result: &mut Fe25519, z: &Fe25519) {
     fe_mul(&mut t2, &xx7, &t1);
 
     /* t2 = z ** (2 ** 40 - 1) */
+    let mut t3 = Fe25519::default();
     fe_square(&mut t3, &t2);
     for _i in 1..20 {
         // (i = 1; i < 20; ++i)
@@ -439,130 +434,8 @@ fn fe_invert(result: &mut Fe25519, z: &Fe25519) {
     *result = Fe25519 { ..out };
 }
 
-fn fe_invert22(result: &mut Fe25519, z: &Fe25519) {
-    // Let p = 2^255 - 19 and 1 = a^(p-1) mod p
-    // Then a^-1 = a^(p-2) which is a^(2^255 - 21)
-    // Now 2^255 - 21 is
-
-    let mut t0 = Fe25519::default();
-    let mut t1 = Fe25519::default();
-    let mut t2 = Fe25519::default();
-    let mut t3 = Fe25519::default();
-    let mut out = Fe25519::default();
-
-    let mut x0 = Fe25519::default();
-    let mut x1 = Fe25519::default();
-    let mut x2 = Fe25519::default();
-    let mut x3 = Fe25519::default();
-    let mut x4 = Fe25519::default();
-    let mut x5 = Fe25519::default();
-    let mut x6 = Fe25519::default();
-
-    /* t0 = z ** 2 */
-    fe_square(&mut t0, &z);
-
-    /* t1 = t0 ** (2 ** 2) = z ** 8 */
-    fe_square(&mut x0, &t0);
-    fe_square(&mut t1, &x0);
-
-    /* t1 = z * t1 = z ** 9 */
-    fe_mul(&mut x1, &z, &t1);
-    /* t0 = t0 * t1 = z ** 11 -- stash t0 away for the end. */
-    fe_mul(&mut x2, &t0, &x1); // was t0
-
-    /* t2 = t0 ** 2 = z ** 22 */
-    fe_square(&mut t2, &x2);
-
-    /* t1 = t1 * t2 = z ** (2 ** 5 - 1) */
-    fe_mul(&mut x3, &t1, &t2); // was t1
-
-    /* t2 = t1 ** (2 ** 5) = z ** ((2 ** 5) * (2 ** 5 - 1)) */
-    fe_square(&mut t2, &x3);
-    for _i in 1..5 {
-        //(i = 1; i < 5; ++i)
-        fe_square(&mut x4, &t2);
-    }
-
-    /* t1 = t1 * t2 = z ** ((2 ** 5 + 1) * (2 ** 5 - 1)) = z ** (2 ** 10 - 1) */
-    fe_mul(&mut x5, &x4, &x3);
-
-    /* Continuing similarly... */
-
-    /* t2 = z ** (2 ** 20 - 1) */
-    fe_square(&mut x4, &x5);
-    for _i in 1..10 {
-        // (i = 1; i < 10; ++i)
-        fe_square(&mut x4, &t2);
-    }
-    fe_mul(&mut x6, &x4, &x5);
-
-    /* t2 = z ** (2 ** 40 - 1) */
-    fe_square(&mut t3, &x6);
-    for _i in 1..20 {
-        //(i = 1; i < 20; ++i)
-        let zz = t3;
-        fe_square(&mut t3, &zz);
-    }
-    let xx6 = x6;
-    fe_mul(&mut x6, &t3, &xx6);
-
-    /* t2 = z ** (2 ** 10) * (2 ** 40 - 1) */
-    for _i in 0..10 {
-        //(i = 0; i < 10; ++i)
-        fe_square(&mut x6, &t2);
-    }
-
-    /* t1 = z ** (2 ** 50 - 1) */
-    let xx5 = x5;
-    fe_mul(&mut x5, &x6, &xx5);
-
-    /* t2 = z ** (2 ** 100 - 1) */
-    fe_square(&mut x6, &x5);
-    for _i in 1..50 {
-        //(i = 1; i < 50; ++i)
-        let xx6 = x6;
-        fe_square(&mut x6, &xx6);
-    }
-
-    let xxx6 = x6;
-    fe_mul(&mut x6, &xxx6, &x5);
-
-    /* t2 = z ** (2 ** 200 - 1) */
-    fe_square(&mut t3, &x6);
-    for _i in 1..10 {
-        // (i = 1; i < 100; ++i)
-        let xxx3 = t3;
-        fe_square(&mut t3, &xxx3);
-    }
-
-    let zz6 = x6;
-    fe_mul(&mut x6, &t3, &zz6);
-
-    /* t2 = z ** ((2 ** 50) * (2 ** 200 - 1) */
-    for _i in 0..50 {
-        //(i = 0; i < 50; ++i)
-        let bb6 = x6;
-        fe_square(&mut x6, &bb6);
-    }
-
-    /* t1 = z ** (2 ** 250 - 1) */
-    fe_mul(&mut x5, &x6, &t1);
-
-    /* t1 = z ** ((2 ** 5) * (2 ** 250 - 1)) */
-    for _i in 0..5 {
-        //(i = 0; i < 5; ++i)
-        let pp5 = x5;
-        fe_square(&mut x5, &pp5);
-    }
-
-    /* Recall t0 = z ** 11; out = z ** (2 ** 255 - 21) */
-    fe_mul(&mut out, &x5, &t0);
-
-    *result = Fe25519 { ..out };
-}
-
 #[allow(non_snake_case)]
-fn mul(k: &Fe25519, u: Fe25519) -> Fe25519 {
+pub(crate) fn mul(result: &mut Fe25519, k: &Fe25519, u: Fe25519) {
     let x_1 = u; // x_1 = u
     let mut x_2 = Fe25519 { x3: 0, x2: 0, x1: 0, x0: 1 }; // x_2 = 1
     let mut z_2 = Fe25519 { x3: 0, x2: 0, x1: 0, x0: 0 }; // z_2 = 0
@@ -587,6 +460,7 @@ fn mul(k: &Fe25519, u: Fe25519) -> Fe25519 {
     for t in (0..(254u8 - 1)).rev() {
         //                                                  For t = bits-1 down to 0:
         let k_t = k_t(&k, t); //                       k_t = (k >> t) & 1
+        println!("{}", x_3);
         swap.x3 ^= k_t.x3; //                                   swap ^= k_t
         swap.x2 ^= k_t.x2;
         swap.x1 ^= k_t.x1;
@@ -594,6 +468,8 @@ fn mul(k: &Fe25519, u: Fe25519) -> Fe25519 {
         fe_cswap(&swap, &mut x_2, &mut x_3); //                 (x_2, x_3) = cswap(swap, x_2, x_3)
         fe_cswap(&swap, &mut z_2, &mut z_3); //       (z_2, z_3) = cswap(swap, z_2, z_3)
         swap = k_t; //                                          swap = k_t
+        println!("{}", swap);
+
         fe_add(&mut A, &x_2, &z_2); //          A = x_2 + z_2
         fe_mul(&mut AA, &A, &A); //             AA = A^2
         fe_sub(&mut B, &x_2, &z_2); //          B = x_2 - z_2
@@ -615,5 +491,12 @@ fn mul(k: &Fe25519, u: Fe25519) -> Fe25519 {
     }
     fe_cswap(&swap, &mut x_2, &mut x_3); //                 (x_2, x_3) = cswap(swap, x_2, x_3)
     fe_cswap(&swap, &mut z_2, &mut z_3); //       (z_2, z_3) = cswap(swap, z_2, z_3)
-    swap //  -->  Return x_2 * (z_2^(p - 2))  --> FIX ME  // Need to implement fast square (eventually)
+
+    let mut t000 = Fe25519::default();
+    fe_invert(&mut t000, &z_2);
+
+    let mut out = Fe25519::default();
+    fe_mul(&mut out, &x_2, &t000);
+
+    *result = Fe25519 { ..out };
 }

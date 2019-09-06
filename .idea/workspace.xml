@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="AnalysisUIOptions">
+    <option name="SPLITTER_PROPORTION" value="0.5678938" />
+  </component>
   <component name="CMakeRunConfigurationManager" shouldGenerate="true" shouldDeleteObsolete="true">
     <generated />
   </component>
@@ -13,8 +16,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5d6280e8-31c4-49f3-828d-fd86ce7cc2bf" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/src/main.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/arith.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/support.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/support.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/tests.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/tests.rs" afterDir="false" />
     </list>
@@ -63,10 +69,36 @@
       </list>
     </option>
   </component>
-  <component name="RunManager">
-    <configuration name="Test lib" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+  <component name="RunManager" selected="Cargo Command.Cargo test">
+    <configuration name="Cargo bench" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
       <option name="channel" value="DEFAULT" />
-      <option name="command" value="test --package curve25519 --lib &quot;&quot;" />
+      <option name="command" value="+nightly bench" />
+      <option name="allFeatures" value="false" />
+      <option name="nocapture" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <envs />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Cargo run" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="channel" value="DEFAULT" />
+      <option name="command" value="+nightly run --package curve25519 --bin curve25519" />
+      <option name="allFeatures" value="false" />
+      <option name="nocapture" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <envs />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Cargo test" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="channel" value="DEFAULT" />
+      <option name="command" value="+nightly test --package curve25519 --bin curve25519" />
       <option name="allFeatures" value="false" />
       <option name="nocapture" value="true" />
       <option name="emulateTerminal" value="false" />
@@ -77,9 +109,28 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
+    <configuration default="true" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
+      <option name="channel" value="DEFAULT" />
+      <option name="command" value="+nightly bench" />
+      <option name="allFeatures" value="false" />
+      <option name="nocapture" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <envs />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <list>
+      <item itemvalue="Cargo Command.Cargo bench" />
+      <item itemvalue="Cargo Command.Cargo run" />
+      <item itemvalue="Cargo Command.Cargo test" />
+    </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Cargo Command.Test lib" />
+        <item itemvalue="Cargo Command.Cargo test" />
+        <item itemvalue="Cargo Command.Cargo run" />
       </list>
     </recent_temporary>
   </component>
@@ -102,6 +153,7 @@
       <workItem from="1567535959798" duration="19151000" />
       <workItem from="1567605159069" duration="727000" />
       <workItem from="1567606365017" duration="11478000" />
+      <workItem from="1567795270682" duration="13586000" />
     </task>
     <task id="LOCAL-00001" summary="initial commit">
       <created>1564537894140</created>

@@ -1,12 +1,13 @@
 #![deny(clippy::all)]
 
-#[cfg(test)]
 use std::ops::Sub;
 use std::str::FromStr;
 
 use num_bigint::{BigUint, RandomBits};
 use num_traits::One;
 use rand::Rng;
+
+use crate::arith::{fe_add, fe_mul, fe_mul_121665, fe_square, fe_sub, mul};
 
 use super::*;
 
@@ -18,7 +19,7 @@ lazy_static! {
     };
 }
 
-fn gimme_number(bits: usize) -> BigUint {
+pub fn gimme_number(bits: usize) -> BigUint {
     let mut rng = rand::thread_rng();
     let mut result: BigUint;
     loop {
@@ -43,7 +44,7 @@ fn gimme_number(bits: usize) -> BigUint {
 #[test]
 fn fuzz_add() {
     let mut s_actual = Fe25519 { x3: 0, x2: 0, x1: 0, x0: 0 };
-    for _index in 1..10_000 {
+    for _index in 1..1_000 {
         let a_exp = gimme_number(256);
         let b_exp = gimme_number(256);
         let sum_exp = Fe25519::from_str(&format!("0x{:064x}", (&a_exp + &b_exp) % &*TWO255M19)).unwrap();
@@ -58,7 +59,7 @@ fn fuzz_add() {
 fn fuzz_sub() {
     let mut s_actual = Fe25519 { x3: 0, x2: 0, x1: 0, x0: 0 };
 
-    for _index in 1..10_000 {
+    for _index in 1..1_000 {
         let a_exp = gimme_number(256);
         let b_exp = gimme_number(256);
         // b - b = 0 = 2**255-19 --> -b = 2**255-19 - b --> a - b = a + 2**255-19 - b
@@ -74,7 +75,7 @@ fn fuzz_sub() {
 #[test]
 fn fuzz_mul() {
     let mut mul_act = Fe25519 { x3: 0, x2: 0, x1: 0, x0: 0 };
-    for _index in 1..10_000 {
+    for _index in 1..1_000 {
         let a_exp = gimme_number(256);
         let b_exp = gimme_number(256);
         let mul_exp = Fe25519::from_str(&format!("0x{:064x}", (&a_exp * &b_exp) % &*TWO255M19)).unwrap();
@@ -88,7 +89,7 @@ fn fuzz_mul() {
 #[test]
 fn fuzz_square() {
     let mut sqr_act = Fe25519 { x3: 0, x2: 0, x1: 0, x0: 0 };
-    for _index in 1..10_000 {
+    for _index in 1..1_000 {
         let a_exp = gimme_number(256);
         let sqr_exp = Fe25519::from_str(&format!("0x{:064x}", (&a_exp * &a_exp) % &*TWO255M19)).unwrap();
         let a_act = Fe25519::from_str(&format!("0x{:064x}", a_exp)).unwrap();
@@ -100,7 +101,7 @@ fn fuzz_square() {
 #[test]
 fn fuzz_mul_121665() {
     let mut mul_act = Fe25519 { x3: 0, x2: 0, x1: 0, x0: 0 };
-    for _index in 1..10_000 {
+    for _index in 1..1_000 {
         let a_exp = gimme_number(256);
         let b_exp = BigUint::from_str("121665").unwrap();
         let mul_exp = Fe25519::from_str(&format!("0x{:064x}", (&a_exp * &b_exp) % &*TWO255M19)).unwrap();
@@ -112,13 +113,31 @@ fn fuzz_mul_121665() {
 
 #[test]
 fn fuzz_inverse() {
-    // Put this in a self-checking loop.
-    let xxx = Fe25519 { x3: 0, x2: 0, x1: 0, x0: 8 };
+    let one = Fe25519::from_str("0x0000000000000000-0000000000000000-0000000000000000-0000000000000001").unwrap();
     let mut result = Fe25519::default();
-    fe_invert(&mut result, &xxx);
-    println!("{}", &xxx);
-    println!("{}", &result);
-    let mut res = Fe25519::default();
-    fe_mul(&mut res, &xxx, &result);
-    println!("{}", res);
+    let mut result_act = Fe25519::default();
+    for _index in 1..1_000 {
+        let operand1 = gimme_number(254);
+        if operand1 == BigUint::from_str("0").unwrap() {
+            continue;
+        }
+        let operand2 = Fe25519::from_str(&format!("0x{:064x}", operand1)).unwrap();
+        fe_invert(&mut result, &operand2);
+        fe_mul(&mut result_act, &operand2, &result);
+        assert_eq!(one, result_act);
+    }
+}
+
+#[test]
+fn fuzz_p_mul() {
+    let one = Fe25519::from_str("0x0000000000000000-0000000000000000-0000000000000000-0000000000000001").unwrap();
+    //let k = Fe25519 { x3: 0x0F, x2: 0, x1: 0, x0: 2 };
+    let k = Fe25519::from_str("0xa546e36bf0527c9d3b16154b82465edd62144c0ac1fc5a18506a2244ba449ac4").unwrap();
+    let u = Fe25519::from_str("0xe6db6867583030db-3594c1a424b15f7c-726624ec26b3353b-10a903a6d0ab1c4c").unwrap();
+    let mut result_act = Fe25519::default();
+    for _index in 1..10_000 {
+        mul(&mut result_act, &k, u);
+        println!("{}", result_act);
+        assert_eq!(one, result_act);
+    }
 }

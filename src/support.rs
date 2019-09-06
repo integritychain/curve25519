@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 use regex::Regex;
 
-use crate::Fe25519;
+use crate::arith::Fe25519;
 
 impl fmt::Display for Fe25519 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
