@@ -41,9 +41,9 @@ fn gimme_number(bits: usize) -> BigUint {
 }
 
 #[test]
-fn test_fuzz_add() {
+fn fuzz_add() {
     let mut s_actual = Fe25519 { x3: 0, x2: 0, x1: 0, x0: 0 };
-    for _index in 1..1_000 {
+    for _index in 1..10_000 {
         let a_exp = gimme_number(256);
         let b_exp = gimme_number(256);
         let sum_exp = Fe25519::from_str(&format!("0x{:064x}", (&a_exp + &b_exp) % &*TWO255M19)).unwrap();
@@ -55,10 +55,10 @@ fn test_fuzz_add() {
 }
 
 #[test]
-fn test_fuzz_sub() {
+fn fuzz_sub() {
     let mut s_actual = Fe25519 { x3: 0, x2: 0, x1: 0, x0: 0 };
 
-    for _index in 1..1_000 {
+    for _index in 1..10_000 {
         let a_exp = gimme_number(256);
         let b_exp = gimme_number(256);
         // b - b = 0 = 2**255-19 --> -b = 2**255-19 - b --> a - b = a + 2**255-19 - b
@@ -72,9 +72,9 @@ fn test_fuzz_sub() {
 }
 
 #[test]
-fn text_fuzz_mul() {
+fn fuzz_mul() {
     let mut mul_act = Fe25519 { x3: 0, x2: 0, x1: 0, x0: 0 };
-    for _index in 1..1_000 {
+    for _index in 1..10_000 {
         let a_exp = gimme_number(256);
         let b_exp = gimme_number(256);
         let mul_exp = Fe25519::from_str(&format!("0x{:064x}", (&a_exp * &b_exp) % &*TWO255M19)).unwrap();
@@ -86,22 +86,21 @@ fn text_fuzz_mul() {
 }
 
 #[test]
-fn text_fuzz_square() {
-    for _index in 1..50_000 {
+fn fuzz_square() {
+    let mut sqr_act = Fe25519 { x3: 0, x2: 0, x1: 0, x0: 0 };
+    for _index in 1..10_000 {
         let a_exp = gimme_number(256);
-        //println!("{}", a_exp);
         let sqr_exp = Fe25519::from_str(&format!("0x{:064x}", (&a_exp * &a_exp) % &*TWO255M19)).unwrap();
-        let mut sqr_act = Fe25519::from_str(&format!("0x{:064x}", a_exp)).unwrap();
-        fe_square(&mut sqr_act);
+        let a_act = Fe25519::from_str(&format!("0x{:064x}", a_exp)).unwrap();
+        fe_square(&mut sqr_act, &a_act);
         assert_eq!(sqr_exp, sqr_act);
     }
 }
 
-
 #[test]
-fn text_fuzz_mul_121665() {
+fn fuzz_mul_121665() {
     let mut mul_act = Fe25519 { x3: 0, x2: 0, x1: 0, x0: 0 };
-    for _index in 1..5_000 {
+    for _index in 1..10_000 {
         let a_exp = gimme_number(256);
         let b_exp = BigUint::from_str("121665").unwrap();
         let mul_exp = Fe25519::from_str(&format!("0x{:064x}", (&a_exp * &b_exp) % &*TWO255M19)).unwrap();
@@ -109,4 +108,17 @@ fn text_fuzz_mul_121665() {
         fe_mul_121665(&mut mul_act, &a_act);
         assert_eq!(mul_exp, mul_act);
     }
+}
+
+#[test]
+fn fuzz_inverse() {
+    // Put this in a self-checking loop.
+    let xxx = Fe25519 { x3: 0, x2: 0, x1: 0, x0: 8 };
+    let mut result = Fe25519::default();
+    fe_invert(&mut result, &xxx);
+    println!("{}", &xxx);
+    println!("{}", &result);
+    let mut res = Fe25519::default();
+    fe_mul(&mut res, &xxx, &result);
+    println!("{}", res);
 }

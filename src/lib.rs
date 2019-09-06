@@ -3,8 +3,9 @@
 // See: https://tools.ietf.org/html/rfc7748
 
 // TODO:
-//   3. General clean up; clippy; lint messages
-//   4. Implement scalar montgomery via RFC 7748 and/or "Montgomery's original paper"
+//   1. fuzz square
+//   2. General clean up; clippy; lint messages
+//   3. Finish mul
 //   5. Add logic to gimme number for middle 0xFFFFF
 
 #[macro_use]
@@ -184,20 +185,19 @@ fn fe_mul(dest: &mut Fe25519, src1: &Fe25519, src2: &Fe25519) {
     debug_assert!(check_size(&dest));
 }
 
-fn fe_square(dest: &mut Fe25519) {
+fn fe_square(dest: &mut Fe25519, src: &Fe25519) {
     debug_assert!(check_size(&dest));
 
-    // for each src1.X multiply and sum src2 (4 'paragraphs')
-    let x0_mul_x0 = u128::from(dest.x0) * u128::from(dest.x0);
-    let x0_mul_x1 = u128::from(dest.x0) * u128::from(dest.x1);
-    let x0_mul_x2 = u128::from(dest.x0) * u128::from(dest.x2);
-    let x0_mul_x3 = u128::from(dest.x0) * u128::from(dest.x3);
-    let x1_mul_x1 = u128::from(dest.x1) * u128::from(dest.x1);
-    let x1_mul_x2 = u128::from(dest.x1) * u128::from(dest.x2);
-    let x1_mul_x3 = u128::from(dest.x1) * u128::from(dest.x3);
-    let x2_mul_x2 = u128::from(dest.x2) * u128::from(dest.x2);
-    let x2_mul_x3 = u128::from(dest.x2) * u128::from(dest.x3);
-    let x3_mul_x3 = u128::from(dest.x3) * u128::from(dest.x3);
+    let x0_mul_x0 = u128::from(src.x0) * u128::from(src.x0);
+    let x0_mul_x1 = u128::from(src.x0) * u128::from(src.x1);
+    let x0_mul_x2 = u128::from(src.x0) * u128::from(src.x2);
+    let x0_mul_x3 = u128::from(src.x0) * u128::from(src.x3);
+    let x1_mul_x1 = u128::from(src.x1) * u128::from(src.x1);
+    let x1_mul_x2 = u128::from(src.x1) * u128::from(src.x2);
+    let x1_mul_x3 = u128::from(src.x1) * u128::from(src.x3);
+    let x2_mul_x2 = u128::from(src.x2) * u128::from(src.x2);
+    let x2_mul_x3 = u128::from(src.x2) * u128::from(src.x3);
+    let x3_mul_x3 = u128::from(src.x3) * u128::from(src.x3);
 
     let scan_1 = (x0_mul_x0 >> 64) + 2 * u128::from(x0_mul_x1 as u64);
     let scan_2 = 2 * (x0_mul_x1 >> 64) + 2 * u128::from(x0_mul_x2 as u64) + u128::from(x1_mul_x1 as u64) + (scan_1 >> 64);
@@ -214,7 +214,6 @@ fn fe_square(dest: &mut Fe25519) {
     let mul_5 = scan_5 as u64;
     let mul_6 = scan_6 as u64;
     let mul_7 = (x3_mul_x3 >> 64) + (scan_6 >> 64);
-
 
     // Reduce t00..t30 by taking 2**256=38
     let x00_red_38 = u128::from(mul_0) + (u128::from(mul_4) * 38);
@@ -248,75 +247,9 @@ fn fe_square(dest: &mut Fe25519) {
     dest.x2 = !rollover & inc_x20 | rollover & (x20_roll_19 as u64);
     dest.x1 = !rollover & inc_x10 | rollover & (x10_roll_19 as u64);
     dest.x0 = !rollover & inc_x00 | rollover & (x00_roll_19 as u64);
-    
-    debug_assert!(check_size(&dest));
-}
-
-fn fe_square2(dest: &mut Fe25519) {
-    debug_assert!(check_size(&dest));
-
-    // for each src1.X multiply and sum src2 (4 'paragraphs')
-    let x0_mul_x0 = u128::from(dest.x0) * u128::from(dest.x0);
-    let mul_x00 = x0_mul_x0 as u64;
-
-    let x0_mul_x1 = 2 * (u128::from(dest.x0) * u128::from(dest.x1)) + (x0_mul_x0 >> 64);
-    let mul_x01 = x0_mul_x1 as u64;
-
-    let x0_mul_x2 = (2 * u128::from(dest.x0) * u128::from(dest.x2)) +
-        u128::from(dest.x1) * u128::from(dest.x1) + (x0_mul_x1 >> 64);
-    let mul_x02 = x0_mul_x2 as u64;
-
-    let x0_mul_x3 = (2 * u128::from(dest.x0) * u128::from(dest.x3)) +
-        (2 * u128::from(dest.x1) * u128::from(dest.x2)) + (x0_mul_x2 >> 64);
-    let mul_x03 = x0_mul_x3 as u64;
-
-    let x0_mul_x4 = (2 * u128::from(dest.x1) * u128::from(dest.x3)) +
-        u128::from(dest.x2) * u128::from(dest.x2) + (x0_mul_x3 >> 64);
-    let mul_x04 = x0_mul_x4 as u64;
-
-    let x0_mul_x5 = (2 * u128::from(dest.x2) * u128::from(dest.x3)) + (x0_mul_x4 >> 64);
-    let mul_x05 = x0_mul_x5 as u64;
-
-    let x0_mul_x6 = u128::from(dest.x3) * u128::from(dest.x3) + (x0_mul_x5 >> 64);
-    let mul_x06 = x0_mul_x6 as u64;
-    let mul_x07 = (x0_mul_x6 >> 64) as u64;
-
-    // Reduce t00..t30 by taking 2**256=38
-    let x00_red_38 = u128::from(mul_x00) + (u128::from(mul_x04) * 38);
-    let red_x00 = x00_red_38 as u64;
-    let x10_red_38 = u128::from(mul_x01) + (u128::from(mul_x05) * 38) + (x00_red_38 >> 64);
-    let red_x10 = x10_red_38 as u64;
-    let x20_red_38 = u128::from(mul_x02) + (u128::from(mul_x06) * 38) + (x10_red_38 >> 64);
-    let red_x20 = x20_red_38 as u64;
-    let x30_red_38 = u128::from(mul_x03) + (u128::from(mul_x07) * 38) + (x20_red_38 >> 64);
-    let red_x30 = x30_red_38 as u64;
-
-    // If MSB is set add 19
-    let x00_inc_19 = u128::from(red_x00) + (x30_red_38 >> 63) as u128 * 19;
-    let inc_x00 = x00_inc_19 as u64;
-    let x10_inc_19 = u128::from(red_x10) + (x00_inc_19 >> 64);
-    let inc_x10 = x10_inc_19 as u64;
-    let x20_inc_19 = u128::from(red_x20) + (x10_inc_19 >> 64);
-    let inc_x20 = x20_inc_19 as u64;
-    let x30_inc_19 = u128::from(red_x30) + (x20_inc_19 >> 64);
-    let inc_x30 = x30_inc_19 as u64 & UMASK63;
-
-    // We could still be above 2**255 - 19; increment and see if we rollover
-    let x00_roll_19 = u128::from(inc_x00) + 19;
-    let x10_roll_19 = (x00_roll_19 >> 64) + u128::from(inc_x10);
-    let x20_roll_19 = (x10_roll_19 >> 64) + u128::from(inc_x20);
-    let x30_roll_19 = (x20_roll_19 >> 64) + u128::from(inc_x30);
-    let rollover = 0u64.overflowing_sub((x30_roll_19 >> 63) as u64).0; // extend 1111... or 0000...
-
-    // If no rollover take the original value, otherwise take the 'roll by 19'
-    dest.x3 = UMASK63 & (!rollover & inc_x30 | rollover & (x30_roll_19 as u64));
-    dest.x2 = !rollover & inc_x20 | rollover & (x20_roll_19 as u64);
-    dest.x1 = !rollover & inc_x10 | rollover & (x10_roll_19 as u64);
-    dest.x0 = !rollover & inc_x00 | rollover & (x00_roll_19 as u64);
 
     debug_assert!(check_size(&dest));
 }
-
 
 fn fe_mul_121665(dest: &mut Fe25519, src: &Fe25519) {
     debug_assert!(check_size(&dest));
@@ -386,8 +319,127 @@ fn k_t(k: &Fe25519, t: u8) -> Fe25519 {
     Fe25519 { x3: 0, x2: 0, x1: 0, x0 }
 }
 
-/**************************
 fn fe_invert(result: &mut Fe25519, z: &Fe25519) {
+    let mut t0 = Fe25519::default();
+    let mut t1 = Fe25519::default();
+    let mut t2 = Fe25519::default();
+    let mut t3 = Fe25519::default();
+
+    /* t0 = z ** 2 */
+    let mut t0 = Fe25519::default();
+    fe_square(&mut t0, &z);
+
+    /* t1 = t0 ** (2 ** 2) = z ** 8 */
+    let mut t1 = Fe25519::default();
+    fe_square(&mut t1, &t0);
+    let xx0 = t1;
+    fe_square(&mut t1, &xx0);
+
+    /* t1 = z * t1 = z ** 9 */
+    let xx1 = t1;
+    fe_mul(&mut t1, &z, &xx1);
+    /* t0 = t0 * t1 = z ** 11 -- stash t0 away for the end. */
+    let xx2 = t0;
+    fe_mul(&mut t0, &xx2, &t1);
+
+    /* t2 = t0 ** 2 = z ** 22 */
+    fe_square(&mut t2, &t0);
+
+    /* t1 = t1 * t2 = z ** (2 ** 5 - 1) */
+    let xx3 = t1;
+    fe_mul(&mut t1, &xx3, &t2);
+
+    /* t2 = t1 ** (2 ** 5) = z ** ((2 ** 5) * (2 ** 5 - 1)) */
+    fe_square(&mut t2, &t1);
+    for _i in 1..5 {
+        //(i = 1; i < 5; ++i)
+        let xx4 = t2;
+        fe_square(&mut t2, &xx4);
+    }
+
+    /* t1 = t1 * t2 = z ** ((2 ** 5 + 1) * (2 ** 5 - 1)) = z ** (2 ** 10 - 1) */
+    let xx5 = t1;
+    fe_mul(&mut t1, &t2, &xx5);
+
+    /* Continuing similarly... */
+
+    /* t2 = z ** (2 ** 20 - 1) */
+    fe_square(&mut t2, &t1);
+    for _i in 1..10 {
+        // (i = 1; i < 10; ++i)
+        let xx6 = t2;
+        fe_square(&mut t2, &xx6);
+    }
+
+    let xx7 = t2;
+    fe_mul(&mut t2, &xx7, &t1);
+
+    /* t2 = z ** (2 ** 40 - 1) */
+    fe_square(&mut t3, &t2);
+    for _i in 1..20 {
+        // (i = 1; i < 20; ++i)
+        let xx8 = t3;
+        fe_square(&mut t3, &xx8);
+    }
+    let xx9 = t2;
+    fe_mul(&mut t2, &t3, &xx9);
+
+    /* t2 = z ** (2 ** 10) * (2 ** 40 - 1) */
+    for _i in 0..10 {
+        //(i = 0; i < 10; ++i)
+        let xx10 = t2;
+        fe_square(&mut t2, &xx10);
+    }
+
+    /* t1 = z ** (2 ** 50 - 1) */
+    let xx11 = t1;
+    fe_mul(&mut t1, &t2, &xx11);
+
+    /* t2 = z ** (2 ** 100 - 1) */
+    fe_square(&mut t2, &t1);
+    for _i in 1..50 {
+        //(i = 1; i < 50; ++i)
+        let xx12 = t2;
+        fe_square(&mut t2, &xx12);
+    }
+    let xx13 = t2;
+    fe_mul(&mut t2, &xx13, &t1);
+
+    /* t2 = z ** (2 ** 200 - 1) */
+    fe_square(&mut t3, &t2);
+    for _i in 1..100 {
+        // (i = 1; i < 100; ++i)
+        let xx14 = t3;
+        fe_square(&mut t3, &xx14);
+    }
+    let xx15 = t2;
+    fe_mul(&mut t2, &t3, &xx15);
+
+    /* t2 = z ** ((2 ** 50) * (2 ** 200 - 1) */
+    for _i in 0..50 {
+        // (i = 0; i < 50; ++i)
+        let xx16 = t2;
+        fe_square(&mut t2, &xx16);
+    }
+
+    /* t1 = z ** (2 ** 250 - 1) */
+    let xx17 = t1;
+    fe_mul(&mut t1, &t2, &xx17);
+
+    /* t1 = z ** ((2 ** 5) * (2 ** 250 - 1)) */
+    for _i in 0..5 {
+        // (i = 0; i < 5; ++i)
+        let xx18 = t1;
+        fe_square(&mut t1, &xx18);
+    }
+    /* Recall t0 = z ** 11; out = z ** (2 ** 255 - 21) */
+    let mut out = Fe25519::default();
+    fe_mul(&mut out, &t1, &t0);
+
+    *result = Fe25519 { ..out };
+}
+
+fn fe_invert22(result: &mut Fe25519, z: &Fe25519) {
     // Let p = 2^255 - 19 and 1 = a^(p-1) mod p
     // Then a^-1 = a^(p-2) which is a^(2^255 - 21)
     // Now 2^255 - 21 is
@@ -398,91 +450,116 @@ fn fe_invert(result: &mut Fe25519, z: &Fe25519) {
     let mut t3 = Fe25519::default();
     let mut out = Fe25519::default();
 
-    //let i = 0u8;
+    let mut x0 = Fe25519::default();
+    let mut x1 = Fe25519::default();
+    let mut x2 = Fe25519::default();
+    let mut x3 = Fe25519::default();
+    let mut x4 = Fe25519::default();
+    let mut x5 = Fe25519::default();
+    let mut x6 = Fe25519::default();
 
     /* t0 = z ** 2 */
-    fe_mul(&mut t0, &z, &z);
+    fe_square(&mut t0, &z);
 
     /* t1 = t0 ** (2 ** 2) = z ** 8 */
-    fe_mul(&mut t1, &t0, &t0);
-    fe_mul(&mut t1, &t1, &t1);
+    fe_square(&mut x0, &t0);
+    fe_square(&mut t1, &x0);
 
     /* t1 = z * t1 = z ** 9 */
-    fe_mul(&mut t1, &z, &t1);
+    fe_mul(&mut x1, &z, &t1);
     /* t0 = t0 * t1 = z ** 11 -- stash t0 away for the end. */
-    fe_mul(&mut t0, &t0, &t1);
+    fe_mul(&mut x2, &t0, &x1); // was t0
 
     /* t2 = t0 ** 2 = z ** 22 */
-    fe_mul(&mut t2, &t0, &t0);
+    fe_square(&mut t2, &x2);
 
     /* t1 = t1 * t2 = z ** (2 ** 5 - 1) */
-    fe_mul(&mut t1, &t1, &t2);
+    fe_mul(&mut x3, &t1, &t2); // was t1
 
     /* t2 = t1 ** (2 ** 5) = z ** ((2 ** 5) * (2 ** 5 - 1)) */
-    fe_mul(&mut t2, &t1, &t1);
-    for _i in 1..5 { //= 1; i < 5; ++i)
-        fe_mul(&mut t2, &t2, &t2);
+    fe_square(&mut t2, &x3);
+    for _i in 1..5 {
+        //(i = 1; i < 5; ++i)
+        fe_square(&mut x4, &t2);
     }
 
     /* t1 = t1 * t2 = z ** ((2 ** 5 + 1) * (2 ** 5 - 1)) = z ** (2 ** 10 - 1) */
-    fe_mul(&mut t1, &t2, &t1);
+    fe_mul(&mut x5, &x4, &x3);
 
     /* Continuing similarly... */
 
     /* t2 = z ** (2 ** 20 - 1) */
-    fe_mul(&mut t2, &t1, &t1);
-    for _i in 1..10 { //(i = 1; i < 10; ++i)
-        fe_mul(&mut t2, &t2, &t2);
+    fe_square(&mut x4, &x5);
+    for _i in 1..10 {
+        // (i = 1; i < 10; ++i)
+        fe_square(&mut x4, &t2);
     }
-    fe_mul(&mut t2, &t2, &t1);
+    fe_mul(&mut x6, &x4, &x5);
 
     /* t2 = z ** (2 ** 40 - 1) */
-    fe_mul(&mut t3, &t2, &t2);
-    for _i in 1..20 { //(i = 1; i < 20; ++i)
-        fe_mul(&mut t3, &t3, &t3);
+    fe_square(&mut t3, &x6);
+    for _i in 1..20 {
+        //(i = 1; i < 20; ++i)
+        let zz = t3;
+        fe_square(&mut t3, &zz);
     }
-    fe_mul(&mut t2, &t3, &t2);
+    let xx6 = x6;
+    fe_mul(&mut x6, &t3, &xx6);
 
     /* t2 = z ** (2 ** 10) * (2 ** 40 - 1) */
-    for _i in 0..10 { //(i = 0; i < 10; ++i)
-        fe_mul(&mut t2, &t2, &t2);
+    for _i in 0..10 {
+        //(i = 0; i < 10; ++i)
+        fe_square(&mut x6, &t2);
     }
+
     /* t1 = z ** (2 ** 50 - 1) */
-    fe_mul(&mut t1, &t2, &t1);
+    let xx5 = x5;
+    fe_mul(&mut x5, &x6, &xx5);
 
     /* t2 = z ** (2 ** 100 - 1) */
-    fe_mul(&mut t2, &t1, &t1);
-    for _i in 1..50 { //(i = 1; i < 50; ++i)
-        fe_mul(&mut t2, &t2, &t2);
+    fe_square(&mut x6, &x5);
+    for _i in 1..50 {
+        //(i = 1; i < 50; ++i)
+        let xx6 = x6;
+        fe_square(&mut x6, &xx6);
     }
-    fe_mul(&mut t2, &t2, &t1);
+
+    let xxx6 = x6;
+    fe_mul(&mut x6, &xxx6, &x5);
 
     /* t2 = z ** (2 ** 200 - 1) */
-    fe_mul(&mut t3, &t2, &t2);
-    for _i in 1..100 { //(i = 1; i < 100; ++i)
-        fe_mul(&mut t3, &t3, &t3);
+    fe_square(&mut t3, &x6);
+    for _i in 1..10 {
+        // (i = 1; i < 100; ++i)
+        let xxx3 = t3;
+        fe_square(&mut t3, &xxx3);
     }
 
-    fe_mul(&mut t2, &t3, &t2);
+    let zz6 = x6;
+    fe_mul(&mut x6, &t3, &zz6);
 
     /* t2 = z ** ((2 ** 50) * (2 ** 200 - 1) */
-    for _i in 0..50 { //(i = 0; i < 50; ++i)
-        fe_mul(&mut t2, &t2, &t2);
+    for _i in 0..50 {
+        //(i = 0; i < 50; ++i)
+        let bb6 = x6;
+        fe_square(&mut x6, &bb6);
     }
 
     /* t1 = z ** (2 ** 250 - 1) */
-    fe_mul(&mut t1, &t2, &t1);
+    fe_mul(&mut x5, &x6, &t1);
 
     /* t1 = z ** ((2 ** 5) * (2 ** 250 - 1)) */
-    for _i in 0..5 { //(i = 0; i < 5; ++i)
-        fe_mul(&mut t1, &t1, &t1);
+    for _i in 0..5 {
+        //(i = 0; i < 5; ++i)
+        let pp5 = x5;
+        fe_square(&mut x5, &pp5);
     }
+
     /* Recall t0 = z ** 11; out = z ** (2 ** 255 - 21) */
-    fe_mul(&mut out, &t1, &t0);
+    fe_mul(&mut out, &x5, &t0);
 
     *result = Fe25519 { ..out };
 }
-**************************/
 
 #[allow(non_snake_case)]
 fn mul(k: &Fe25519, u: Fe25519) -> Fe25519 {

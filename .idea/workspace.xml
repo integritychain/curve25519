@@ -13,7 +13,6 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5d6280e8-31c4-49f3-828d-fd86ce7cc2bf" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/rustfmt.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/support.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/support.rs" afterDir="false" />
@@ -146,7 +145,14 @@
       <option name="project" value="LOCAL" />
       <updated>1565228127384</updated>
     </task>
-    <option name="localTasksCounter" value="7" />
+    <task id="LOCAL-00007" summary="square coming alive">
+      <created>1567713181139</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1567713181139</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -174,7 +180,8 @@
     <MESSAGE value="progress on reduce inside add" />
     <MESSAGE value="add/mult/reduce working" />
     <MESSAGE value="add/mult/sub/mult_121665/reduce working" />
-    <option name="LAST_COMMIT_MESSAGE" value="add/mult/sub/mult_121665/reduce working" />
+    <MESSAGE value="square coming alive" />
+    <option name="LAST_COMMIT_MESSAGE" value="square coming alive" />
     <option name="OPTIMIZE_IMPORTS_BEFORE_PROJECT_COMMIT" value="true" />
     <option name="REFORMAT_BEFORE_PROJECT_COMMIT" value="true" />
     <option name="REARRANGE_BEFORE_PROJECT_COMMIT" value="true" />
