@@ -14,6 +14,13 @@ impl fmt::Display for Fe25519 {
     }
 }
 
+impl fmt::Binary for Fe25519 {
+    // Hijack this for big-endian display
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "0x{:016x}-{:016x}-{:016x}-{:016x}", u64::from_be(self.x0), u64::from_be(self.x1), u64::from_be(self.x2), u64::from_be(self.x3))
+    }
+}
+
 impl fmt::Debug for Fe25519 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "0x{:016x}-{:016x}-{:016x}-{:016x}", self.x3, self.x2, self.x1, self.x0)

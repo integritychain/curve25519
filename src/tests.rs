@@ -128,23 +128,45 @@ fn fuzz_inverse() {
     }
 }
 
-fn reverse_new(input: &str) -> String {
-    //let x = input.chars().rev().collect();
-    input.to_string()
-    //x
-}
+
+//#[test]
+//fn fuzz_p_mul() {
+//    let result_exp = "0x422c8e7a6227d7bc-a1350b3e2bb7279f-7897b87bb6854b78-3c60e80311ae3079";
+//    //let k = get_k("4000000000000000-0000000000000000-0000000000000000-0000000000000009");
+//    let mut k = get_k("0900000000000000-0000000000000000-0000000000000000-0000000000000000"); // big endian?
+//    //let u = get_u("0000000000000000-0000000000000000-0000000000000000-0000000000000009");
+//    let mut u = get_u("0900000000000000-0000000000000000-0000000000000000-0000000000000000");
+//    let mut result_act = Fe25519::default();
+//    for _index in 1..10_000 {
+//        mul(&mut result_act, &k, u);
+//        let res = format!("{:b}", result_act);
+//        assert_eq!(result_exp, res);
+//    }
+//}
+
 
 #[test]
 fn fuzz_p_mul() {
-    let one = Fe25519::from_str("0x0000000000000000-0000000000000000-0000000000000000-0000000000000001").unwrap();
-    let result_exp = Fe25519::from_str("0x422c8e7a6227d7bc-a1350b3e2bb7279f-7897b87bb6854b78-3c60e80311ae3079").unwrap();
-    //let k = Fe25519 { x3: 0x0F, x2: 0, x1: 0, x0: 2 };
-    let k = get_k(&reverse_new("4000000000000000-0000000000000000-0000000000000000-0000000000000009"));
-    let u = get_u(&reverse_new("0000000000000000-0000000000000000-0000000000000000-0000000000000009"));
+    // The second type of test vector consists of...once
+    let mut result_exp = "0x422c8e7a6227d7bc-a1350b3e2bb7279f-7897b87bb6854b78-3c60e80311ae3079";
+    let mut k = get_k("0x0900000000000000-0000000000000000-0000000000000000-0000000000000000");
+    let mut u = get_u("0x0900000000000000-0000000000000000-0000000000000000-0000000000000000");
     let mut result_act = Fe25519::default();
-    for _index in 1..10_000 {
+    mul(&mut result_act, &k, u);
+    let res = format!("{:b}", result_act);
+    assert_eq!(result_exp, res);
+
+    // The second type of test vector consists of...1000
+    result_exp = "0x684cf59ba8330955-2800ef566f2f4d3c-1c3887c49360e387-5f2eb94d99532c51";
+    k = get_k("0x0900000000000000-0000000000000000-0000000000000000-0000000000000000");
+    u = get_u("0x0900000000000000-0000000000000000-0000000000000000-0000000000000000");
+    for index in 0..1_001 {
         mul(&mut result_act, &k, u);
-        println!("Result: {}", result_act);
-        assert_eq!(result_exp, result_act);
+        println!("{} Res: {:b}", index, result_act);
+        u = get_u(&format!("{:b}", k));
+        k = get_k(&format!("{:b}", result_act));
     }
+    let res = format!("{:b}", result_act);
+    //println!("Res: {:b}", result_act);
+    assert_eq!(result_exp, res);
 }

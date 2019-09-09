@@ -18,7 +18,6 @@
     <list default="true" id="5d6280e8-31c4-49f3-828d-fd86ce7cc2bf" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/arith.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/arith.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/support.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/support.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/tests.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/tests.rs" afterDir="false" />
     </list>
@@ -152,7 +151,8 @@
       <workItem from="1567605159069" duration="727000" />
       <workItem from="1567606365017" duration="11478000" />
       <workItem from="1567795270682" duration="13586000" />
-      <workItem from="1567985426680" duration="4007000" />
+      <workItem from="1567985426680" duration="4752000" />
+      <workItem from="1568066633916" duration="4799000" />
     </task>
     <task id="LOCAL-00001" summary="initial commit">
       <created>1564537894140</created>
@@ -203,7 +203,14 @@
       <option name="project" value="LOCAL" />
       <updated>1567713181139</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="endian soln starting...">
+      <created>1567990181004</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1567990181004</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -232,7 +239,8 @@
     <MESSAGE value="add/mult/reduce working" />
     <MESSAGE value="add/mult/sub/mult_121665/reduce working" />
     <MESSAGE value="square coming alive" />
-    <option name="LAST_COMMIT_MESSAGE" value="square coming alive" />
+    <MESSAGE value="endian soln starting..." />
+    <option name="LAST_COMMIT_MESSAGE" value="endian soln starting..." />
     <option name="OPTIMIZE_IMPORTS_BEFORE_PROJECT_COMMIT" value="true" />
     <option name="REFORMAT_BEFORE_PROJECT_COMMIT" value="true" />
     <option name="REARRANGE_BEFORE_PROJECT_COMMIT" value="true" />
