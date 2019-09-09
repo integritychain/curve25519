@@ -7,7 +7,7 @@ use num_bigint::{BigUint, RandomBits};
 use num_traits::One;
 use rand::Rng;
 
-use crate::arith::{fe_add, fe_mul, fe_mul_121665, fe_square, fe_sub, mul};
+use crate::arith::{fe_add, fe_mul, fe_mul_121665, fe_square, fe_sub, get_k, get_u, mul};
 
 use super::*;
 
@@ -128,16 +128,23 @@ fn fuzz_inverse() {
     }
 }
 
+fn reverse_new(input: &str) -> String {
+    //let x = input.chars().rev().collect();
+    input.to_string()
+    //x
+}
+
 #[test]
 fn fuzz_p_mul() {
     let one = Fe25519::from_str("0x0000000000000000-0000000000000000-0000000000000000-0000000000000001").unwrap();
+    let result_exp = Fe25519::from_str("0x422c8e7a6227d7bc-a1350b3e2bb7279f-7897b87bb6854b78-3c60e80311ae3079").unwrap();
     //let k = Fe25519 { x3: 0x0F, x2: 0, x1: 0, x0: 2 };
-    let k = Fe25519::from_str("0xa546e36bf0527c9d3b16154b82465edd62144c0ac1fc5a18506a2244ba449ac4").unwrap();
-    let u = Fe25519::from_str("0xe6db6867583030db-3594c1a424b15f7c-726624ec26b3353b-10a903a6d0ab1c4c").unwrap();
+    let k = get_k(&reverse_new("4000000000000000-0000000000000000-0000000000000000-0000000000000009"));
+    let u = get_u(&reverse_new("0000000000000000-0000000000000000-0000000000000000-0000000000000009"));
     let mut result_act = Fe25519::default();
     for _index in 1..10_000 {
         mul(&mut result_act, &k, u);
-        println!("{}", result_act);
-        assert_eq!(one, result_act);
+        println!("Result: {}", result_act);
+        assert_eq!(result_exp, result_act);
     }
 }

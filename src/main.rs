@@ -1,5 +1,4 @@
 #![feature(test)]
-
 #![deny(clippy::all)]
 
 // See: https://tools.ietf.org/html/rfc7748
@@ -9,7 +8,6 @@
 //   1. General clean up; clippy; lint messages
 //   2. Finish mul point
 //   3. Add logic to gimme number for middle 0xFFFFF
-
 
 #[macro_use]
 extern crate lazy_static;
