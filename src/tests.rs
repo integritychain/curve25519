@@ -2,14 +2,13 @@
 
 use std::ops::Sub;
 use std::str::FromStr;
+use std::time::Instant;
 
 use num_bigint::{BigUint, RandomBits};
 use num_traits::One;
 use rand::Rng;
 
-use crate::arith::{fe_add, fe_mul, fe_mul_121665, fe_square, fe_sub, get_k, get_u, mul};
-
-use super::*;
+use crate::arith::{Fe25519, fe_add, fe_invert, fe_mul, fe_mul_121665, fe_square, fe_sub, get_k, get_u, mul};
 
 lazy_static! {
     static ref TWO255M19: BigUint = {
@@ -19,7 +18,7 @@ lazy_static! {
     };
 }
 
-pub fn gimme_number(bits: usize) -> BigUint {
+pub fn generate_operand(bits: usize) -> BigUint {
     let mut rng = rand::thread_rng();
     let mut result: BigUint;
     loop {
@@ -28,7 +27,7 @@ pub fn gimme_number(bits: usize) -> BigUint {
             1 => BigUint::from_str("1").unwrap(),
             2 => BigUint::from_str("2").unwrap(),
             3 => BigUint::from_str("3").unwrap(),
-            4 => (&*TWO255M19).clone().sub(4 as u32), // Adjust matching for smaller bit widths
+            4 => (&*TWO255M19).clone().sub(4 as u32),
             5 => (&*TWO255M19).clone().sub(3 as u32),
             6 => (&*TWO255M19).clone().sub(2 as u32),
             7 => (&*TWO255M19).clone().sub(1 as u32),
@@ -45,8 +44,8 @@ pub fn gimme_number(bits: usize) -> BigUint {
 fn fuzz_add() {
     let mut s_actual = Fe25519 { x3: 0, x2: 0, x1: 0, x0: 0 };
     for _index in 1..1_000 {
-        let a_exp = gimme_number(256);
-        let b_exp = gimme_number(256);
+        let a_exp = generate_operand(256);
+        let b_exp = generate_operand(256);
         let sum_exp = Fe25519::from_str(&format!("0x{:064x}", (&a_exp + &b_exp) % &*TWO255M19)).unwrap();
         let a_actual = Fe25519::from_str(&format!("0x{:064x}", a_exp)).unwrap();
         let b_actual = Fe25519::from_str(&format!("0x{:064x}", b_exp)).unwrap();
@@ -58,10 +57,9 @@ fn fuzz_add() {
 #[test]
 fn fuzz_sub() {
     let mut s_actual = Fe25519 { x3: 0, x2: 0, x1: 0, x0: 0 };
-
     for _index in 1..1_000 {
-        let a_exp = gimme_number(256);
-        let b_exp = gimme_number(256);
+        let a_exp = generate_operand(256);
+        let b_exp = generate_operand(256);
         // b - b = 0 = 2**255-19 --> -b = 2**255-19 - b --> a - b = a + 2**255-19 - b
         let c_exp = &*TWO255M19 - &b_exp;
         let sum_exp = Fe25519::from_str(&format!("0x{:064x}", (&a_exp + &c_exp) % &*TWO255M19)).unwrap();
@@ -76,8 +74,8 @@ fn fuzz_sub() {
 fn fuzz_mul() {
     let mut mul_act = Fe25519 { x3: 0, x2: 0, x1: 0, x0: 0 };
     for _index in 1..1_000 {
-        let a_exp = gimme_number(256);
-        let b_exp = gimme_number(256);
+        let a_exp = generate_operand(256);
+        let b_exp = generate_operand(256);
         let mul_exp = Fe25519::from_str(&format!("0x{:064x}", (&a_exp * &b_exp) % &*TWO255M19)).unwrap();
         let a_act = Fe25519::from_str(&format!("0x{:064x}", a_exp)).unwrap();
         let b_act = Fe25519::from_str(&format!("0x{:064x}", b_exp)).unwrap();
@@ -90,7 +88,7 @@ fn fuzz_mul() {
 fn fuzz_square() {
     let mut sqr_act = Fe25519 { x3: 0, x2: 0, x1: 0, x0: 0 };
     for _index in 1..1_000 {
-        let a_exp = gimme_number(256);
+        let a_exp = generate_operand(256);
         let sqr_exp = Fe25519::from_str(&format!("0x{:064x}", (&a_exp * &a_exp) % &*TWO255M19)).unwrap();
         let a_act = Fe25519::from_str(&format!("0x{:064x}", a_exp)).unwrap();
         fe_square(&mut sqr_act, &a_act);
@@ -102,7 +100,7 @@ fn fuzz_square() {
 fn fuzz_mul_121665() {
     let mut mul_act = Fe25519 { x3: 0, x2: 0, x1: 0, x0: 0 };
     for _index in 1..1_000 {
-        let a_exp = gimme_number(256);
+        let a_exp = generate_operand(256);
         let b_exp = BigUint::from_str("121665").unwrap();
         let mul_exp = Fe25519::from_str(&format!("0x{:064x}", (&a_exp * &b_exp) % &*TWO255M19)).unwrap();
         let a_act = Fe25519::from_str(&format!("0x{:064x}", a_exp)).unwrap();
@@ -117,7 +115,7 @@ fn fuzz_inverse() {
     let mut result = Fe25519::default();
     let mut result_act = Fe25519::default();
     for _index in 1..1_000 {
-        let operand1 = gimme_number(254);
+        let operand1 = generate_operand(254);
         if operand1 == BigUint::from_str("0").unwrap() {
             continue;
         }
@@ -128,85 +126,56 @@ fn fuzz_inverse() {
     }
 }
 
-
-//#[test]
-//fn fuzz_p_mul() {
-//    let result_exp = "0x422c8e7a6227d7bc-a1350b3e2bb7279f-7897b87bb6854b78-3c60e80311ae3079";
-//    //let k = get_k("4000000000000000-0000000000000000-0000000000000000-0000000000000009");
-//    let mut k = get_k("0900000000000000-0000000000000000-0000000000000000-0000000000000000"); // big endian?
-//    //let u = get_u("0000000000000000-0000000000000000-0000000000000000-0000000000000009");
-//    let mut u = get_u("0900000000000000-0000000000000000-0000000000000000-0000000000000000");
-//    let mut result_act = Fe25519::default();
-//    for _index in 1..10_000 {
-//        mul(&mut result_act, &k, u);
-//        let res = format!("{:b}", result_act);
-//        assert_eq!(result_exp, res);
-//    }
-//}
-
-
-fn swap_bytes(source: &Fe25519) -> Fe25519 {
-    Fe25519 { x3: u64::from_be(source.x0), x2: u64::from_be(source.x1), x1: u64::from_be(source.x2), x0: u64::from_be(source.x3) }
-}
-
-
 #[test]
-fn fuzz_p_mul() {
-    // The second type of test vector consists of...once
-    let mut result_exp = "0x422c8e7a6227d7bc-a1350b3e2bb7279f-7897b87bb6854b78-3c60e80311ae3079";
-    let mut k = get_k("0x0900000000000000-0000000000000000-0000000000000000-0000000000000000");
-    let mut u = get_u("0x0900000000000000-0000000000000000-0000000000000000-0000000000000000");
+fn iterative_mul() {
+    let k = get_k("0x0900000000000000-0000000000000000-0000000000000000-0000000000000000");
+    let u = get_u("0x0900000000000000-0000000000000000-0000000000000000-0000000000000000");
     let mut result_act = Fe25519::default();
     mul(&mut result_act, &k, u);
-    let mut res = format!("{:b}", result_act);
-    assert_eq!(result_exp, res);
-    println!("Passed 'once' test");
+    let result_str = format!("{:b}", result_act);
+    assert_eq!(result_str, "0x422c8e7a6227d7bc-a1350b3e2bb7279f-7897b87bb6854b78-3c60e80311ae3079");
+    println!("Passed 'once' iterative_mul test");
 
-    result_exp = "0xc3da55379de9c690-8e94ea4df28d084f-32eccf03491c71f7-54b4075577a28552";
-    k = get_k("0xa546e36bf0527c9d-3b16154b82465edd-62144c0ac1fc5a18-506a2244ba449ac4");
-    u = get_u("0xe6db6867583030db-3594c1a424b15f7c-726624ec26b3353b-10a903a6d0ab1c4c");
-    result_act = Fe25519::default();
+    let k = get_k("0xa546e36bf0527c9d-3b16154b82465edd-62144c0ac1fc5a18-506a2244ba449ac4");
+    let u = get_u("0xe6db6867583030db-3594c1a424b15f7c-726624ec26b3353b-10a903a6d0ab1c4c");
+    let mut result_act = Fe25519::default();
     mul(&mut result_act, &k, u);
-    res = format!("{:b}", result_act);
-    assert_eq!(result_exp, res);
-    println!("Passed 'first' test");
+    let result_str = format!("{:b}", result_act);
+    assert_eq!(result_str, "0xc3da55379de9c690-8e94ea4df28d084f-32eccf03491c71f7-54b4075577a28552");
+    println!("Passed 'first' iterative_mul test");
 
-    // The second type of test vector consists of...1000
-    ////let result_exp = "0x684cf59ba8330955-2800ef566f2f4d3c-1c3887c49360e387-5f2eb94d99532c51";
     let mut k_string = "0x0900000000000000-0000000000000000-0000000000000000-0000000000000000".to_string();
     let mut u_string = "0x0900000000000000-0000000000000000-0000000000000000-0000000000000000".to_string();
-
-    for index in 0..1_000_000 {
-        //println!("k_string {}", k_string);
+    let start_time = Instant::now();
+    for index in 0..5_000 {  // Set to 1M for full test
         let k = get_k(&k_string);
         let u = get_u(&u_string);
-        if index < 4 {
-            println!("k going in {}", &k);
-            println!("u going in {}", &u);
-        }
         mul(&mut result_act, &k, u);
         let result_str = format!("{:b}", result_act);
-        if index == 0 {
-            assert_eq!(result_str, "0x422c8e7a6227d7bc-a1350b3e2bb7279f-7897b87bb6854b78-3c60e80311ae3079");
-            println!("Passed 1X case");
-        }
-        if index == 999 {
-            assert_eq!(result_str, "0x684cf59ba8330955-2800ef566f2f4d3c-1c3887c49360e387-5f2eb94d99532c51");
-            println!("Passed 1,000X case")
-        }
-        if index == 999_999 {
-            assert_eq!(result_str, "0x7c3911e0ab2586fd-864497297e575e6f-3bc601c0883c30df-5f4dd2d24f665424");
-            println!("Passed 1,000,000X case")
-        }
-        if index < 4 {
-            println!("{} Res: {:b}", index, result_act);
-            println!("{} Resb {}", index, &result_str);
+        match index {
+            0 => {
+                assert_eq!(result_str, "0x422c8e7a6227d7bc-a1350b3e2bb7279f-7897b87bb6854b78-3c60e80311ae3079");
+                println!("Passed 1X iterative_mul case");
+            },
+            999 => {
+                assert_eq!(result_str, "0x684cf59ba8330955-2800ef566f2f4d3c-1c3887c49360e387-5f2eb94d99532c51");
+                println!("Passed 1,000X iterative_mul case")
+            },
+            4_999 => {
+                assert_eq!(result_str, "0x90aca1c8dab080cc-cf82d3e972f2dbac-319e1a1424a77852-a8b57a5957458353");
+                println!("Passed 5,000X iterative_mul case")
+            },
+            999_999 => {
+                assert_eq!(result_str, "0x7c3911e0ab2586fd-864497297e575e6f-3bc601c0883c30df-5f4dd2d24f665424");
+                println!("Passed 1,000,000X iterative_mul case")
+            }
+            _ => {},
         }
         u_string = k_string;
         k_string = result_str;
-//        u = swap_bytes(&get_u(&format!("{:b}", &k)));
-//        k = get_k(&format!("{:b}", &result_act));
-//        println!("Next u: {:b}", u);
-//        println!("Next k: {:b}", k);
     }
+
+    // Yes, tests are running in parallel and potentially unoptimized ... this is a relative metric ; )
+    let duration = start_time.elapsed();
+    println!("Mul rate is {:3.3}k per second.", 5_000.0 / duration.as_millis() as f64);
 }

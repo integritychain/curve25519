@@ -1,18 +1,8 @@
 #![deny(clippy::all)]
 
-
-//#[macro_use]
-//extern crate lazy_static;
-
 use std::str::FromStr;
-use test::test_main;
 
 use crate::support::check_size;
-
-//mod support;
-
-//#[cfg(test)]
-//mod tests;
 
 const UMASK63: u64 = (1 << 63) - 1; // 0x7FFF_FFFF_FFFF_FFFF
 
@@ -25,46 +15,12 @@ pub struct Fe25519 {
     pub x0: u64,
 }
 
-// Per section 5 for RFC7748 - BUT DON'T SEE REDUCTION!
-//pub fn get_u(src: &str) -> Fe25519 {
-//    let new_u = format!("0x{}", src);
-//    let mut temp = Fe25519::from_str(&new_u).unwrap();
-//    temp.x3 = temp.x3 & UMASK63;
-//    // Rollover logic driven by the case (2**255 - 19) + (small, e.g. 4) --> CAN WE OPTIMIZE?
-//    // Need run-time check; point mult may never encounter this
-//    let x0_roll_19 = u128::from(temp.x0) + 19;
-//    let roll_x0 = x0_roll_19 as u64;
-//    let x1_roll_19 = (x0_roll_19 >> 64) + u128::from(temp.x1);
-//    let roll_x1 = x1_roll_19 as u64;
-//    let x2_roll_19 = (x1_roll_19 >> 64) + u128::from(temp.x2);
-//    let roll_x2 = x2_roll_19 as u64;
-//    let x3_roll_19 = (x2_roll_19 >> 64) + u128::from(temp.x3);
-//    let roll_x3 = x3_roll_19 as u64;
-//    let mut rollover = 0u64;
-//    if (roll_x3 >> 63) == 1 {
-//        rollover = 0xFFFF_FFFF_FFFF_FFFF;
-//        println!("rollover from u");
-//    }
-//    //let rollover = 0u64.overflowing_sub((x3_roll_19 >> 63) as u64).0; // extend 1111... or 0000...
-//
-//    // Based on rollover, choose original sum or 'incremented by 19' sum
-//    let dest = Fe25519 {
-//        x3: UMASK63 & (!rollover & temp.x3 | rollover & roll_x3),
-//        x2: !rollover & temp.x2 | rollover & roll_x2,
-//        x1: !rollover & temp.x1 | rollover & roll_x1,
-//        x0: !rollover & temp.x0 | rollover & roll_x0,
-//    };
-//    println!("Dest U : {}", dest);
-//    dest
-//}
-
 pub fn get_u(src: &str) -> Fe25519 {
     let new_u = format!("{}", src);
     let temp1 = Fe25519::from_str(&new_u).unwrap();
     let temp2 = Fe25519 { x3: u64::from_be(temp1.x0), x2: u64::from_be(temp1.x1), x1: u64::from_be(temp1.x2), x0: u64::from_be(temp1.x3) };
 
-    //temp2.x3 = temp2.x3 & UMASK63;
-    // Rollover logic driven by the case (2**255 - 19) + (small, e.g. 4) --> CAN WE OPTIMIZE?
+    // Rollover logic driven by the case (2**255 - 19) + (small, e.g. 4)
     // Need run-time check; point mult may never encounter this
     let x0_roll_19 = u128::from(temp2.x0) + 19;
     let roll_x0 = x0_roll_19 as u64;
@@ -74,34 +30,16 @@ pub fn get_u(src: &str) -> Fe25519 {
     let roll_x2 = x2_roll_19 as u64;
     let x3_roll_19 = (x2_roll_19 >> 64) + u128::from(temp2.x3);
     let roll_x3 = x3_roll_19 as u64;
-    //let mut rollover = 0u64;
-//    if (roll_x3 >> 63) == 1 {
-//        rollover = 0xFFFF_FFFF_FFFF_FFFF;
-//        println!("rollover from u");
-//    }
-    let rollover = 0u64.overflowing_sub((x3_roll_19 >> 63) as u64).0; // extend 1111... or 0000...
+    let rollover = 0u64.overflowing_sub((x3_roll_19 >> 63) as u64).0;
 
     // Based on rollover, choose original sum or 'incremented by 19' sum
-    let dest = Fe25519 {
+    Fe25519 {
         x3: UMASK63 & (!rollover & temp2.x3 | rollover & roll_x3),
         x2: !rollover & temp2.x2 | rollover & roll_x2,
         x1: !rollover & temp2.x1 | rollover & roll_x1,
         x0: !rollover & temp2.x0 | rollover & roll_x0,
-    };
-    //println!("Dest U : {}", dest);
-    dest
+    }
 }
-
-
-//pub fn get_k(src: &str) -> Fe25519 {
-//    let new_k = format!("0x{}", src);
-//    let mut temp = Fe25519::from_str(&new_k).unwrap();
-//    temp.x0 = temp.x0 & 0xFFFF_FFFF_FFFF_FFF8;
-//    temp.x3 = temp.x3 & 0x7FFF_FFFF_FFFF_FFFF;
-//    //temp.x3 = temp.x3 | 0x4000_0000_0000_0000;
-//    println!("K is {}", temp);
-//    temp
-//}
 
 pub fn get_k(src: &str) -> Fe25519 {
     let new_k = format!("{}", src);
@@ -110,7 +48,6 @@ pub fn get_k(src: &str) -> Fe25519 {
     temp2.x0 = temp2.x0 & 0xFFFF_FFFF_FFFF_FFF8;
     temp2.x3 = temp2.x3 & 0x7FFF_FFFF_FFFF_FFFF;
     temp2.x3 = temp2.x3 | 0x4000_0000_0000_0000;
-    //println!("K is {}", temp2);
     debug_assert!(check_size(&temp2));
     temp2
 }
@@ -163,7 +100,6 @@ pub(crate) fn fe_add(dest: &mut Fe25519, src1: &Fe25519, src2: &Fe25519) {
     debug_assert!(check_size(dest));
 }
 
-// For a - b, if b > a then it wraps around 2*255 and we need to adjust by -19
 pub(crate) fn fe_sub(dest: &mut Fe25519, src1: &Fe25519, src2: &Fe25519) {
     debug_assert!(check_size(&src1));
     debug_assert!(check_size(&src2));
@@ -362,8 +298,6 @@ pub(crate) fn fe_mul_121665(dest: &mut Fe25519, src: &Fe25519) {
     let x3_inc_19 = u128::from(mul_x3) + (x2_inc_19 >> 64);
     let inc_x3 = x3_inc_19 as u64;
 
-    // Seems like we need a rollover check here too ?!?!?
-
     dest.x3 = UMASK63 & inc_x3;
     dest.x2 = inc_x2;
     dest.x1 = inc_x1;
@@ -405,7 +339,6 @@ fn k_t(k: &Fe25519, t: i16) -> Fe25519 {
     }
 
     if (x0 & 01) != 0 {
-        //println!("Swap!");
         Fe25519 { x3: 0xFFFFFFFFFFFFFFFF, x2: 0xFFFFFFFFFFFFFFFF, x1: 0xFFFFFFFFFFFFFFFF, x0: 0xFFFFFFFFFFFFFFFF }
     } else {
         Fe25519 { x3: 0, x2: 0, x1: 0, x0: 0 }
@@ -552,10 +485,8 @@ pub(crate) fn mul(result: &mut Fe25519, k: &Fe25519, u: Fe25519) {
     let mut t5 = Fe25519::default();
 
     for t in (0..=(255i16 - 1)).rev() {
-        //println!("{}", t);
         //                                                  For t = bits-1 down to 0:
         let k_t = k_t(&k, t); //                       k_t = (k >> t) & 1
-        //println!("{}", x_3);
         swap.x3 ^= k_t.x3; //                                   swap ^= k_t
         swap.x2 ^= k_t.x2;
         swap.x1 ^= k_t.x1;
@@ -563,7 +494,6 @@ pub(crate) fn mul(result: &mut Fe25519, k: &Fe25519, u: Fe25519) {
         fe_cswap(&swap, &mut x_2, &mut x_3); //                 (x_2, x_3) = cswap(swap, x_2, x_3)
         fe_cswap(&swap, &mut z_2, &mut z_3); //       (z_2, z_3) = cswap(swap, z_2, z_3)
         swap = k_t; //                                          swap = k_t
-        //println!("{}", swap);
 
         fe_add(&mut A, &x_2, &z_2); //          A = x_2 + z_2
         fe_mul(&mut AA, &A, &A); //             AA = A^2
