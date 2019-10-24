@@ -145,6 +145,11 @@ fn fuzz_inverse() {
 //}
 
 
+fn swap_bytes(source: &Fe25519) -> Fe25519 {
+    Fe25519 { x3: u64::from_be(source.x0), x2: u64::from_be(source.x1), x1: u64::from_be(source.x2), x0: u64::from_be(source.x3) }
+}
+
+
 #[test]
 fn fuzz_p_mul() {
     // The second type of test vector consists of...once
@@ -153,20 +158,55 @@ fn fuzz_p_mul() {
     let mut u = get_u("0x0900000000000000-0000000000000000-0000000000000000-0000000000000000");
     let mut result_act = Fe25519::default();
     mul(&mut result_act, &k, u);
-    let res = format!("{:b}", result_act);
+    let mut res = format!("{:b}", result_act);
     assert_eq!(result_exp, res);
+    println!("Passed 'once' test");
+
+    result_exp = "0xc3da55379de9c690-8e94ea4df28d084f-32eccf03491c71f7-54b4075577a28552";
+    k = get_k("0xa546e36bf0527c9d-3b16154b82465edd-62144c0ac1fc5a18-506a2244ba449ac4");
+    u = get_u("0xe6db6867583030db-3594c1a424b15f7c-726624ec26b3353b-10a903a6d0ab1c4c");
+    result_act = Fe25519::default();
+    mul(&mut result_act, &k, u);
+    res = format!("{:b}", result_act);
+    assert_eq!(result_exp, res);
+    println!("Passed 'first' test");
 
     // The second type of test vector consists of...1000
-    result_exp = "0x684cf59ba8330955-2800ef566f2f4d3c-1c3887c49360e387-5f2eb94d99532c51";
-    k = get_k("0x0900000000000000-0000000000000000-0000000000000000-0000000000000000");
-    u = get_u("0x0900000000000000-0000000000000000-0000000000000000-0000000000000000");
-    for index in 0..1_001 {
+    ////let result_exp = "0x684cf59ba8330955-2800ef566f2f4d3c-1c3887c49360e387-5f2eb94d99532c51";
+    let mut k_string = "0x0900000000000000-0000000000000000-0000000000000000-0000000000000000".to_string();
+    let mut u_string = "0x0900000000000000-0000000000000000-0000000000000000-0000000000000000".to_string();
+
+    for index in 0..1_000_000 {
+        //println!("k_string {}", k_string);
+        let k = get_k(&k_string);
+        let u = get_u(&u_string);
+        if index < 4 {
+            println!("k going in {}", &k);
+            println!("u going in {}", &u);
+        }
         mul(&mut result_act, &k, u);
-        println!("{} Res: {:b}", index, result_act);
-        u = get_u(&format!("{:b}", k));
-        k = get_k(&format!("{:b}", result_act));
+        let result_str = format!("{:b}", result_act);
+        if index == 0 {
+            assert_eq!(result_str, "0x422c8e7a6227d7bc-a1350b3e2bb7279f-7897b87bb6854b78-3c60e80311ae3079");
+            println!("Passed 1X case");
+        }
+        if index == 999 {
+            assert_eq!(result_str, "0x684cf59ba8330955-2800ef566f2f4d3c-1c3887c49360e387-5f2eb94d99532c51");
+            println!("Passed 1,000X case")
+        }
+        if index == 999_999 {
+            assert_eq!(result_str, "0x7c3911e0ab2586fd-864497297e575e6f-3bc601c0883c30df-5f4dd2d24f665424");
+            println!("Passed 1,000,000X case")
+        }
+        if index < 4 {
+            println!("{} Res: {:b}", index, result_act);
+            println!("{} Resb {}", index, &result_str);
+        }
+        u_string = k_string;
+        k_string = result_str;
+//        u = swap_bytes(&get_u(&format!("{:b}", &k)));
+//        k = get_k(&format!("{:b}", &result_act));
+//        println!("Next u: {:b}", u);
+//        println!("Next k: {:b}", k);
     }
-    let res = format!("{:b}", result_act);
-    //println!("Res: {:b}", result_act);
-    assert_eq!(result_exp, res);
 }

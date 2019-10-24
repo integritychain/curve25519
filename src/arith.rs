@@ -60,10 +60,10 @@ pub struct Fe25519 {
 
 pub fn get_u(src: &str) -> Fe25519 {
     let new_u = format!("{}", src);
-    let mut temp1 = Fe25519::from_str(&new_u).unwrap();
-    let mut temp2 = Fe25519 { x3: u64::from_be(temp1.x0), x2: u64::from_be(temp1.x1), x1: u64::from_be(temp1.x2), x0: u64::from_be(temp1.x3) };
+    let temp1 = Fe25519::from_str(&new_u).unwrap();
+    let temp2 = Fe25519 { x3: u64::from_be(temp1.x0), x2: u64::from_be(temp1.x1), x1: u64::from_be(temp1.x2), x0: u64::from_be(temp1.x3) };
 
-    temp2.x3 = temp2.x3 & UMASK63;
+    //temp2.x3 = temp2.x3 & UMASK63;
     // Rollover logic driven by the case (2**255 - 19) + (small, e.g. 4) --> CAN WE OPTIMIZE?
     // Need run-time check; point mult may never encounter this
     let x0_roll_19 = u128::from(temp2.x0) + 19;
@@ -74,12 +74,12 @@ pub fn get_u(src: &str) -> Fe25519 {
     let roll_x2 = x2_roll_19 as u64;
     let x3_roll_19 = (x2_roll_19 >> 64) + u128::from(temp2.x3);
     let roll_x3 = x3_roll_19 as u64;
-    let mut rollover = 0u64;
-    if (roll_x3 >> 63) == 1 {
-        rollover = 0xFFFF_FFFF_FFFF_FFFF;
-        println!("rollover from u");
-    }
-    //let rollover = 0u64.overflowing_sub((x3_roll_19 >> 63) as u64).0; // extend 1111... or 0000...
+    //let mut rollover = 0u64;
+//    if (roll_x3 >> 63) == 1 {
+//        rollover = 0xFFFF_FFFF_FFFF_FFFF;
+//        println!("rollover from u");
+//    }
+    let rollover = 0u64.overflowing_sub((x3_roll_19 >> 63) as u64).0; // extend 1111... or 0000...
 
     // Based on rollover, choose original sum or 'incremented by 19' sum
     let dest = Fe25519 {
@@ -105,12 +105,13 @@ pub fn get_u(src: &str) -> Fe25519 {
 
 pub fn get_k(src: &str) -> Fe25519 {
     let new_k = format!("{}", src);
-    let mut temp1 = Fe25519::from_str(&new_k).unwrap();
+    let temp1 = Fe25519::from_str(&new_k).unwrap();
     let mut temp2 = Fe25519 { x3: u64::from_be(temp1.x0), x2: u64::from_be(temp1.x1), x1: u64::from_be(temp1.x2), x0: u64::from_be(temp1.x3) };
     temp2.x0 = temp2.x0 & 0xFFFF_FFFF_FFFF_FFF8;
     temp2.x3 = temp2.x3 & 0x7FFF_FFFF_FFFF_FFFF;
     temp2.x3 = temp2.x3 | 0x4000_0000_0000_0000;
     //println!("K is {}", temp2);
+    debug_assert!(check_size(&temp2));
     temp2
 }
 
@@ -391,7 +392,7 @@ fn fe_cswap(swap: &Fe25519, x_2: &mut Fe25519, x_3: &mut Fe25519) {
 // To be optimized away...
 fn k_t(k: &Fe25519, t: i16) -> Fe25519 {
     //= (k >> t) & 1
-    let mut x0: u64 = 0;
+    let x0: u64;//= 0;
     // match against range is experimental, so use if-else-etc
     if t <= 63 {
         x0 = k.x0 >> t as u64;
